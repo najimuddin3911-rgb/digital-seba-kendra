@@ -102,89 +102,6 @@ function PassInput({ placeholder, value, onChange, required, autoComplete }) {
   );
 }
 
-function ManageTab({ services, setServices, showToast, btnD, user }) {
-  const [newName, setNewName] = useState("");
-  const [newPrice, setNewPrice] = useState("");
-  const inp2 = {padding:"9px 12px",border:"1.5px solid #ddd",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none"};
-
-  function addNew() {
-    if(!newName.trim()){ showToast("❌ সেবার নাম লিখুন"); return; }
-    const svc = { id: Date.now(), name: newName.trim(), price: parseFloat(newPrice)||0 };
-    setServices(s => [...s, svc]);
-    setNewName(""); setNewPrice("");
-    showToast(`✅ "${svc.name}" সেবা যোগ হয়েছে`);
-  }
-
-  function deleteSvc(i, name) {
-    if(!window.confirm(`"${name}" মুছে ফেলবেন?`)) return;
-    setServices(s => s.filter((_,j) => j !== i));
-    showToast(`🗑️ "${name}" মুছে ফেলা হয়েছে`);
-  }
-
-  return (
-    <div>
-      <h2 style={{margin:"0 0 6px",fontSize:20,fontWeight:700}}>⚙️ সেবা সম্পাদনা করুন</h2>
-      <p style={{color:"#888",fontSize:13,margin:"0 0 16px"}}>সেবার নাম বা মূল্য পরিবর্তন করুন, নতুন সেবা যোগ করুন বা মুছুন।</p>
-
-      {/* ➕ নতুন সেবা যোগ করার বক্স */}
-      <div style={{background:"#fff",border:"2px dashed #1a1a1a",borderRadius:14,padding:"18px 16px",marginBottom:20}}>
-        <h3 style={{margin:"0 0 14px",fontSize:15,fontWeight:700,color:"#1a1a1a"}}>➕ নতুন সেবা তৈরি করুন</h3>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-          <input
-            type="text"
-            placeholder="সেবার নাম লিখুন..."
-            value={newName}
-            onChange={e=>setNewName(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&addNew()}
-            style={{...inp2, flex:2, minWidth:180}}
-          />
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontWeight:700,fontSize:15}}>৳</span>
-            <input
-              type="number"
-              placeholder="মূল্য"
-              value={newPrice}
-              onChange={e=>setNewPrice(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&addNew()}
-              style={{...inp2, width:100}}
-            />
-          </div>
-          <button onClick={addNew}
-            style={{...btnD(true), whiteSpace:"nowrap", padding:"9px 20px"}}>
-            ✅ যোগ করুন
-          </button>
-        </div>
-      </div>
-
-      {/* বিদ্যমান সেবার তালিকা */}
-      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
-        {services.map((svc,i)=>(
-          <div key={svc.id} style={{background:"#fff",border:"2px solid #1a1a1a",borderRadius:12,padding:"12px 14px",display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <span style={{fontSize:13,color:"#888",minWidth:22}}>{i+1}.</span>
-            <input value={svc.name} onChange={e=>setServices(s=>s.map((x,j)=>j===i?{...x,name:e.target.value}:x))}
-              style={{...inp2, flex:2, minWidth:150}}/>
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{fontWeight:700}}>৳</span>
-              <input type="number" value={svc.price} onChange={e=>setServices(s=>s.map((x,j)=>j===i?{...x,price:parseFloat(e.target.value)||0}:x))}
-                style={{...inp2, width:85}}/>
-            </div>
-            <button onClick={()=>deleteSvc(i,svc.name)}
-              title="মুছুন"
-              style={{background:"#fff0f0",border:"1.5px solid #e74c3c",color:"#e74c3c",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:15,fontFamily:"inherit",fontWeight:700}}>
-              🗑️
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-        <button onClick={()=>{if(window.confirm("সব সেবা ডিফল্টে ফিরিয়ে আনবেন?"))setServices(DEFAULT_SERVICES);showToast("ডিফল্টে ফিরিয়ে আনা হয়েছে");}} style={btnD(false)}>🔄 ডিফল্টে ফিরুন</button>
-        <button onClick={()=>showToast("পরিবর্তন সংরক্ষিত হয়েছে ✅")} style={btnD(true)}>💾 সংরক্ষণ করুন</button>
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const [user, setUser] = useState(()=>{ try{return JSON.parse(localStorage.getItem("dsUser"));}catch{return null;} });
   const [services, setServices] = useState(DEFAULT_SERVICES);
@@ -493,7 +410,28 @@ td{padding:9px 12px;border-bottom:1px solid #e8e2d6;font-size:13px}tr:nth-child(
 
         {/* MANAGE */}
         {tab==="manage"&&(
-          <ManageTab services={services} setServices={setServices} showToast={showToast} btnD={btnD} user={user}/>
+          <div>
+            <h2 style={{margin:"0 0 6px",fontSize:20,fontWeight:700}}>⚙️ সেবা সম্পাদনা করুন</h2>
+            <p style={{color:"#888",fontSize:13,margin:"0 0 20px"}}>সেবার নাম বা মূল্য পরিবর্তন করুন।</p>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+              {services.map((svc,i)=>(
+                <div key={svc.id} style={{background:"#fff",border:"2px solid #1a1a1a",borderRadius:12,padding:"12px 16px",display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{fontSize:13,color:"#888",minWidth:24}}>{i+1}.</span>
+                  <input value={svc.name} onChange={e=>setServices(s=>s.map((x,j)=>j===i?{...x,name:e.target.value}:x))}
+                    style={{flex:2,minWidth:160,padding:"8px 10px",border:"1.5px solid #ddd",borderRadius:7,fontSize:13,fontFamily:"inherit"}}/>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontWeight:600}}>৳</span>
+                    <input type="number" value={svc.price} onChange={e=>setServices(s=>s.map((x,j)=>j===i?{...x,price:parseFloat(e.target.value)||0}:x))}
+                      style={{width:85,padding:"8px 10px",border:"1.5px solid #ddd",borderRadius:7,fontSize:13,fontFamily:"inherit"}}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <button onClick={()=>{setServices(DEFAULT_SERVICES);showToast("ডিফল্টে ফিরিয়ে আনা হয়েছে");}} style={btnD(false)}>🔄 ডিফল্টে ফিরুন</button>
+              <button onClick={()=>showToast("পরিবর্তন সংরক্ষিত হয়েছে ✅")} style={btnD(true)}>💾 সংরক্ষণ করুন</button>
+            </div>
+          </div>
         )}
       </div>}
 
