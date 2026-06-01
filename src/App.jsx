@@ -61,6 +61,8 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [reportPeriod, setReportPeriod] = useState("day");
   const [reportDate, setReportDate] = useState(getTodayKey());
+  const [newSvcName, setNewSvcName] = useState("");
+  const [newSvcPrice, setNewSvcPrice] = useState("");
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem(SERVICES_KEY, JSON.stringify(services)); }, [services]);
@@ -396,7 +398,47 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         {tab === "manage" && (
           <div>
             <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700 }}>⚙️ সেবা সম্পাদনা করুন</h2>
-            <p style={{ color: "#888", fontSize: 13, margin: "0 0 20px" }}>সেবার নাম বা মূল্য পরিবর্তন করুন।</p>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 16px" }}>সেবার নাম বা মূল্য পরিবর্তন করুন, নতুন সেবা যোগ করুন বা মুছুন।</p>
+
+            {/* নতুন সেবা যোগ করার ফর্ম */}
+            <div style={{ background: "#fff", border: "2px dashed #1a1a1a", borderRadius: 12, padding: "16px", marginBottom: 20 }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700 }}>➕ নতুন সেবা তৈরি করুন</h3>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  type="text"
+                  placeholder="সেবার নাম লিখুন..."
+                  value={newSvcName}
+                  onChange={e => setNewSvcName(e.target.value)}
+                  style={{ flex: 2, minWidth: 180, padding: "9px 12px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>৳</span>
+                  <input
+                    type="number"
+                    placeholder="মূল্য"
+                    value={newSvcPrice}
+                    onChange={e => setNewSvcPrice(e.target.value)}
+                    style={{ width: 100, padding: "9px 10px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (!newSvcName.trim()) { showToast("❌ সেবার নাম লিখুন"); return; }
+                    const price = parseFloat(newSvcPrice) || 0;
+                    const newSvc = { id: Date.now(), name: newSvcName.trim(), price };
+                    setServices(prev => [...prev, newSvc]);
+                    setNewSvcName("");
+                    setNewSvcPrice("");
+                    showToast(`✅ "${newSvc.name}" সেবা যোগ হয়েছে`);
+                  }}
+                  style={{ ...S.btn(true), whiteSpace: "nowrap" }}
+                >
+                  ✅ যোগ করুন
+                </button>
+              </div>
+            </div>
+
+            {/* বিদ্যমান সেবার তালিকা */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
               {services.map((svc, i) => (
                 <div key={svc.id} style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -408,11 +450,24 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
                     <input type="number" value={svc.price} onChange={e => setServices(s => s.map((x, j) => j === i ? { ...x, price: parseFloat(e.target.value)||0 } : x))}
                       style={{ width: 85, padding: "8px 10px", border: "1.5px solid #ddd", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
                   </div>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`"${svc.name}" সেবাটি মুছে ফেলবেন?`)) {
+                        setServices(s => s.filter((_, j) => j !== i));
+                        showToast(`🗑️ "${svc.name}" মুছে ফেলা হয়েছে`);
+                      }
+                    }}
+                    title="মুছুন"
+                    style={{ background: "#fff0f0", border: "1.5px solid #e74c3c", color: "#e74c3c", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                  >
+                    🗑️
+                  </button>
                 </div>
               ))}
             </div>
+
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => { setServices(DEFAULT_SERVICES); showToast("ডিফল্টে ফিরিয়ে আনা হয়েছে"); }} style={S.btn(false)}>🔄 ডিফল্টে ফিরুন</button>
+              <button onClick={() => { if(window.confirm("সব সেবা ডিফল্টে ফিরিয়ে আনবেন?")) { setServices(DEFAULT_SERVICES); showToast("ডিফল্টে ফিরিয়ে আনা হয়েছে"); }}} style={S.btn(false)}>🔄 ডিফল্টে ফিরুন</button>
               <button onClick={() => showToast("পরিবর্তন সংরক্ষিত হয়েছে ✅")} style={S.btn(true)}>💾 সংরক্ষণ করুন</button>
             </div>
           </div>
