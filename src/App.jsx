@@ -63,6 +63,9 @@ export default function App() {
   const [reportDate, setReportDate] = useState(getTodayKey());
   const [newSvcName, setNewSvcName] = useState("");
   const [newSvcPrice, setNewSvcPrice] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [confirmPass, setConfirmPass] = useState("");
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem(SERVICES_KEY, JSON.stringify(services)); }, [services]);
@@ -80,6 +83,10 @@ export default function App() {
     e.preventDefault();
     const users = getUsers();
     if (loginMode === "register") {
+      if (loginForm.pass !== confirmPass) {
+        setLoginError("পাসওয়ার্ড দুটি মিলছে না।");
+        return;
+      }
       if (users.find(u => u.contact === loginForm.contact)) {
         setLoginError("এই ইমেইল/নম্বর দিয়ে আগেই অ্যাকাউন্ট আছে।");
         return;
@@ -236,7 +243,7 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {["login", "register"].map(m => (
-            <button key={m} onClick={() => { setLoginMode(m); setLoginError(""); }}
+            <button key={m} onClick={() => { setLoginMode(m); setLoginError(""); setConfirmPass(""); setShowPass(false); setShowConfirmPass(false); }}
               style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "2px solid #1a1a1a", background: loginMode === m ? "#1a1a1a" : "#fff", color: loginMode === m ? "#f5f0e8" : "#1a1a1a", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
               {m === "login" ? "লগইন" : "নিবন্ধন"}
             </button>
@@ -245,8 +252,44 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         <form onSubmit={handleAuth} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input type="text" placeholder="জিমেইল বা মোবাইল নম্বর" value={loginForm.contact}
             onChange={e => setLoginForm(f => ({ ...f, contact: e.target.value }))} required style={S.input} />
-          <input type="password" placeholder="পাসওয়ার্ড" value={loginForm.pass}
-            onChange={e => setLoginForm(f => ({ ...f, pass: e.target.value }))} required style={S.input} />
+          {/* পাসওয়ার্ড ঘর */}
+          <div style={{ position: "relative" }}>
+            <input
+              type={showPass ? "text" : "password"}
+              placeholder="পাসওয়ার্ড"
+              value={loginForm.pass}
+              onChange={e => setLoginForm(f => ({ ...f, pass: e.target.value }))}
+              required
+              style={{ ...S.input, paddingRight: 42 }}
+            />
+            <button type="button" onClick={() => setShowPass(v => !v)}
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#888", padding: 0, lineHeight: 1 }}>
+              {showPass ? "🙈" : "👁️"}
+            </button>
+          </div>
+          {/* কনফার্ম পাসওয়ার্ড — শুধু নিবন্ধনের সময় */}
+          {loginMode === "register" && (
+            <div style={{ position: "relative" }}>
+              <input
+                type={showConfirmPass ? "text" : "password"}
+                placeholder="পাসওয়ার্ড নিশ্চিত করুন"
+                value={confirmPass}
+                onChange={e => setConfirmPass(e.target.value)}
+                required
+                style={{ ...S.input, paddingRight: 42, borderColor: confirmPass && loginForm.pass !== confirmPass ? "#e74c3c" : "#ddd" }}
+              />
+              <button type="button" onClick={() => setShowConfirmPass(v => !v)}
+                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#888", padding: 0, lineHeight: 1 }}>
+                {showConfirmPass ? "🙈" : "👁️"}
+              </button>
+              {confirmPass && loginForm.pass !== confirmPass && (
+                <p style={{ color: "#e74c3c", fontSize: 12, margin: "4px 0 0" }}>পাসওয়ার্ড মিলছে না ❌</p>
+              )}
+              {confirmPass && loginForm.pass === confirmPass && (
+                <p style={{ color: "#27ae60", fontSize: 12, margin: "4px 0 0" }}>পাসওয়ার্ড মিলেছে ✅</p>
+              )}
+            </div>
+          )}
           {loginError && <p style={{ color: "#c0392b", fontSize: 13, textAlign: "center", margin: 0 }}>{loginError}</p>}
           <button type="submit" style={{ ...S.btn(true), width: "100%", padding: "12px 0", fontSize: 15 }}>
             {loginMode === "login" ? "লগইন করুন" : "অ্যাকাউন্ট তৈরি করুন"}
