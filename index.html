@@ -76,6 +76,22 @@ const DEFAULT_SERVICES=[
   {id:14,name:"পাসপোর্ট ও স্ট্যাম্প সাইজ ফটো (৪ পিস)",price:40},
 ];
 
+// সেবা ফিচার তালিকা
+const FEATURES=[
+  {icon:"🧾",title:"ইনভয়েস প্রিন্ট",desc:"যেকোনো সময়ের ইনভয়েস এক ক্লিকে PDF বা প্রিন্ট করুন"},
+  {icon:"📅",title:"দৈনিক হিসাব",desc:"প্রতিদিন কত টাকা আয় হয়েছে তা সঙ্গে সঙ্গে দেখুন"},
+  {icon:"📆",title:"সাপ্তাহিক হিসাব",desc:"সপ্তাহের মোট আয় ও সেবার বিশদ বিবরণ"},
+  {icon:"🗓️",title:"মাসিক হিসাব",desc:"মাস শেষে মোট আয়, কোন সেবা কতটি হয়েছে সব হিসাব"},
+  {icon:"📊",title:"বার্ষিক হিসাব",desc:"বছরের সম্পূর্ণ আয়-ব্যয়ের পরিসংখ্যান ও বিশ্লেষণ"},
+  {icon:"🛒",title:"নিজের মতো প্রোডাক্ট সাজান",desc:"সেবার নাম ও মূল্য যখন খুশি পরিবর্তন করুন, নতুন সেবা যোগ করুন"},
+  {icon:"💸",title:"বিনামূল্যে সারাজীবন",desc:"কোনো মাসিক ফি নেই — একবার নিবন্ধন করলেই সারাজীবন বিনামূল্যে"},
+  {icon:"🕐",title:"লাইভ ঘড়ি ও ক্যালেন্ডার",desc:"ড্যাশবোর্ডে রিয়েলটাইম ঘড়ি ও ক্যালেন্ডার সবসময় দৃশ্যমান"},
+  {icon:"☁️",title:"ক্লাউড সংরক্ষণ",desc:"সব ডেটা Firebase-এ সুরক্ষিত — যেকোনো ডিভাইস থেকে দেখুন"},
+  {icon:"🔒",title:"সম্পূর্ণ নিরাপদ লগইন",desc:"আপনার ডেটা শুধু আপনিই দেখতে পারবেন"},
+  {icon:"📱",title:"মোবাইল ফ্রেন্ডলি",desc:"মোবাইল, ট্যাবলেট ও কম্পিউটার সব ডিভাইসে কাজ করে"},
+  {icon:"🆕",title:"নতুন সেবা আসছে",desc:"ভবিষ্যতে SMS রিপোর্ট, গ্রাফ চার্ট, স্টক ম্যানেজমেন্ট ও আরো সুবিধা যুক্ত হবে"},
+];
+
 const QURAN=[
   {ar:"وَأَحَلَّ اللَّهُ الْبَيْعَ وَحَرَّمَ الرِّبَا",bn:"আল্লাহ ব্যবসাকে হালাল করেছেন এবং সুদকে হারাম করেছেন।",ref:"সূরা বাকারা ২:২৭৫"},
   {ar:"يَا أَيُّهَا الَّذِينَ آمَنُوا إِذَا تَدَايَنتُم بِدَيْنٍ إِلَىٰ أَجَلٍ مُّسَمًّى فَاكْتُبُوهُ",bn:"হে ঈমানদারগণ! নির্দিষ্ট সময়ের জন্য ঋণের লেনদেন করলে তা লিখে রাখো।",ref:"সূরা বাকারা ২:২৮২"},
@@ -187,11 +203,10 @@ function MiniCalendar({transactions}){
   );
 }
 
-// ইসলামিক কার্ড - একটি কার্ডে কোরআন ও হাদিস
+// ইসলামিক কার্ড
 function IslamicSection(){
   const [qi,setQi]=useState(0);
   const [hi,setHi]=useState(0);
-  const [activeTab,setActiveTab]=useState("quran");
   useEffect(()=>{const t=setInterval(()=>setQi(i=>(i+1)%QURAN.length),8000);return()=>clearInterval(t);},[]);
   useEffect(()=>{const t=setInterval(()=>setHi(i=>(i+1)%HADITH.length),9500);return()=>clearInterval(t);},[]);
   const q=QURAN[qi],h=HADITH[hi];
@@ -201,75 +216,54 @@ function IslamicSection(){
         <span style={{fontSize:18}}>☪️</span>
         <h3 style={{fontSize:15,fontWeight:700,color:C.g,margin:0}}>ব্যবসা ও হিসাব সম্পর্কিত ইসলামিক দিকনির্দেশনা</h3>
       </div>
-      <div style={{background:"linear-gradient(135deg,#fdf8f0 0%,#f5e6c8 100%)",borderRadius:16,border:"1.5px solid #e8d5a0",boxShadow:"0 4px 18px rgba(180,140,60,0.13)",overflow:"hidden"}}>
-        {/* ট্যাব বাটন */}
-        <div style={{display:"flex",borderBottom:"1.5px solid #e8d5a0"}}>
-          <button onClick={()=>setActiveTab("quran")} style={{flex:1,padding:"11px 0",border:"none",background:activeTab==="quran"?"rgba(180,140,60,0.15)":"transparent",color:activeTab==="quran"?"#7a5a10":"#9a7a30",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",borderBottom:activeTab==="quran"?"2.5px solid #b5762c":"2.5px solid transparent"}}>📖 কোরআনের আয়াত</button>
-          <button onClick={()=>setActiveTab("hadith")} style={{flex:1,padding:"11px 0",border:"none",background:activeTab==="hadith"?"rgba(0,0,0,0.06)":"transparent",color:activeTab==="hadith"?"#333":"#777",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",borderBottom:activeTab==="hadith"?"2.5px solid #555":"2.5px solid transparent"}}>📚 হাদিস শরীফ</button>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:14}}>
+        <div className="quran-card fade-in">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{background:"rgba(180,140,60,0.15)",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,color:"#7a5a10"}}>📖 কোরআনের আয়াত</span>
+            <div style={{display:"flex",gap:4}}>{QURAN.map((_,i)=><div key={i} onClick={()=>setQi(i)} style={{width:6,height:6,borderRadius:"50%",background:i===qi?"#b5762c":"rgba(180,140,60,0.3)",cursor:"pointer"}}/>)}</div>
+          </div>
+          <p style={{fontSize:15,lineHeight:2,fontFamily:"serif",direction:"rtl",textAlign:"right",marginBottom:10,color:"#2a1a00"}}>{q.ar}</p>
+          <p style={{fontSize:13,lineHeight:1.7,color:"#4a3a10",marginBottom:6}}>{q.bn}</p>
+          <p style={{fontSize:11,color:"#9a7a30",fontWeight:600}}>{q.ref}</p>
         </div>
-        {/* কোরআন */}
-        {activeTab==="quran"&&(
-          <div className="fade-in" style={{padding:"18px 20px",color:"#3d2b0e"}}>
-            <p style={{fontSize:15,lineHeight:2,fontFamily:"serif",direction:"rtl",textAlign:"right",marginBottom:10,color:"#2a1a00"}}>{q.ar}</p>
-            <p style={{fontSize:13,lineHeight:1.7,color:"#4a3a10",marginBottom:8}}>{q.bn}</p>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <p style={{fontSize:11,color:"#9a7a30",fontWeight:600,margin:0}}>{q.ref}</p>
-              <div style={{display:"flex",gap:4}}>{QURAN.map((_,i)=><div key={i} onClick={()=>setQi(i)} style={{width:6,height:6,borderRadius:"50%",background:i===qi?"#b5762c":"rgba(180,140,60,0.3)",cursor:"pointer"}}/>)}</div>
-            </div>
+        <div className="hadith-card fade-in">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{background:"rgba(0,0,0,0.08)",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,color:"#444"}}>📚 হাদিস শরীফ</span>
+            <div style={{display:"flex",gap:4}}>{HADITH.map((_,i)=><div key={i} onClick={()=>setHi(i)} style={{width:6,height:6,borderRadius:"50%",background:i===hi?"#555":"rgba(0,0,0,0.2)",cursor:"pointer"}}/>)}</div>
           </div>
-        )}
-        {/* হাদিস */}
-        {activeTab==="hadith"&&(
-          <div className="fade-in" style={{padding:"18px 20px",color:"#2a2a2a"}}>
-            <p style={{fontSize:13,lineHeight:1.8,color:"#222",marginBottom:8,fontStyle:"italic"}}>"{h.t}"</p>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <p style={{fontSize:11,color:"#777",fontWeight:600,margin:0}}>— {h.s}</p>
-              <div style={{display:"flex",gap:4}}>{HADITH.map((_,i)=><div key={i} onClick={()=>setHi(i)} style={{width:6,height:6,borderRadius:"50%",background:i===hi?"#555":"rgba(0,0,0,0.2)",cursor:"pointer"}}/>)}</div>
-            </div>
-          </div>
-        )}
+          <p style={{fontSize:13,lineHeight:1.8,color:"#222",marginBottom:8,fontStyle:"italic"}}>"{h.t}"</p>
+          <p style={{fontSize:11,color:"#777",fontWeight:600}}>— {h.s}</p>
+        </div>
       </div>
     </div>
   );
 }
 
-// সেবার ফিচার সেকশন (পাবলিক পেজে) - লিস্ট আকারে
+// সেবার ফিচার সেকশন (পাবলিক পেজে)
 function FeaturesSection(){
-  const feats=[
-    {icon:"🧾",title:"ইনভয়েস প্রিন্ট",desc:"এক ক্লিকে PDF বা প্রিন্ট"},
-    {icon:"📅",title:"দৈনিক হিসাব",desc:"প্রতিদিনের আয়ের হিসাব"},
-    {icon:"📆",title:"সাপ্তাহিক হিসাব",desc:"সাপ্তাহিক আয়ের বিবরণ"},
-    {icon:"🗓️",title:"মাসিক হিসাব",desc:"মাসিক আয় ও সেবার হিসাব"},
-    {icon:"📊",title:"বার্ষিক হিসাব",desc:"বার্ষিক পরিসংখ্যান"},
-    {icon:"💸",title:"খরচের হিসাব",desc:"দৈনিক/মাসিক খরচ ট্র্যাক"},
-    {icon:"🛒",title:"কাস্টম সেবা",desc:"নিজের মতো সেবা সাজান"},
-    {icon:"☁️",title:"ক্লাউড সংরক্ষণ",desc:"Firebase-এ নিরাপদ ডেটা"},
-    {icon:"🔒",title:"নিরাপদ লগইন",desc:"শুধু আপনিই দেখতে পারবেন"},
-    {icon:"📱",title:"মোবাইল ফ্রেন্ডলি",desc:"যেকোনো ডিভাইসে কাজ করে"},
-    {icon:"💰",title:"বিনামূল্যে",desc:"কোনো মাসিক ফি নেই"},
-    {icon:"🆕",title:"নতুন ফিচার আসছে",desc:"SMS রিপোর্ট, চার্ট ও আরো"},
-  ];
   return(
     <div style={{marginTop:28}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
         <span style={{fontSize:18}}>✨</span>
         <h3 style={{fontSize:16,fontWeight:700,color:C.g,margin:0}}>আপনি যা যা সুবিধা পাচ্ছেন</h3>
       </div>
-      <p style={{fontSize:13,color:C.m,marginBottom:14}}>মোট <strong style={{color:C.g}}>{feats.length} ধরনের সুবিধা</strong> — সম্পূর্ণ বিনামূল্যে</p>
-      <div style={{background:C.w,border:`1.5px solid ${C.b}`,borderRadius:14,padding:"14px 18px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-        <ul style={{listStyle:"none",padding:0,margin:0,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"6px 18px"}}>
-          {feats.map((f,i)=>(
-            <li key={i} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",borderBottom:`1px solid ${C.b}`,fontSize:12,color:C.t}}>
-              <span style={{fontSize:15,minWidth:20}}>{f.icon}</span>
-              <span><strong style={{color:C.g,fontSize:12}}>{f.title}</strong> — <span style={{color:C.m}}>{f.desc}</span></span>
-            </li>
-          ))}
-        </ul>
+      <p style={{fontSize:13,color:C.m,marginBottom:16}}>মোট <strong style={{color:C.g}}>{FEATURES.length} ধরনের সুবিধা</strong> — সম্পূর্ণ বিনামূল্যে</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10}}>
+        {FEATURES.map((f,i)=>(
+          <div key={i} className="feature-card" style={{background:C.w,border:`1.5px solid ${C.b}`,borderRadius:13,padding:"14px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+              <span style={{fontSize:22,lineHeight:1,minWidth:28}}>{f.icon}</span>
+              <div>
+                <div style={{fontWeight:700,fontSize:13,color:C.t,marginBottom:3}}>{f.title}</div>
+                <div style={{fontSize:12,color:C.m,lineHeight:1.5}}>{f.desc}</div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
-
 
 function ManageTab({services,setServices,showToast,bs}){
   const [nn,setNn]=useState("");
@@ -325,10 +319,6 @@ function App(){
   const [rDate,setRDate]=useState(getTodayKey());
   const [showAuthModal,setShowAuthModal]=useState(false);
   const [authInitMode,setAuthInitMode]=useState("login");
-  const [expenses,setExpenses]=useState(()=>{try{return JSON.parse(localStorage.getItem("dsExpenses"))||[];}catch{return [];}});
-  const [expForm,setExpForm]=useState({amount:"",desc:"",category:"",date:getTodayKey()});
-  const [expPeriod,setExpPeriod]=useState("day");
-  const [expDate,setExpDate]=useState(getTodayKey());
 
   useEffect(()=>{
     if(!user)return;
@@ -343,20 +333,6 @@ function App(){
   },[user]);
 
   useEffect(()=>{if(!user)return;fbSet(`users/${safeKey(user.contact)}/services`,services);},[services]);
-  useEffect(()=>{localStorage.setItem("dsExpenses",JSON.stringify(expenses));},[expenses]);
-
-  function addExpense(){
-    if(!expForm.amount||!expForm.desc){showToast("❌ পরিমাণ ও বিবরণ লিখুন");return;}
-    const ex={id:Date.now(),date:expForm.date||getTodayKey(),amount:parseFloat(expForm.amount)||0,desc:expForm.desc,category:expForm.category||"সাধারণ"};
-    setExpenses(p=>[...p,ex]);
-    setExpForm({amount:"",desc:"",category:"",date:getTodayKey()});
-    showToast(`✅ খরচ যোগ হয়েছে: ৳${ex.amount}`);
-  }
-  function deleteExpense(id){if(!window.confirm("এই খরচ মুছবেন?"))return;setExpenses(p=>p.filter(e=>e.id!==id));}
-  function getExpFiltered(period,key){return expenses.filter(e=>{if(period==="day")return e.date===key;if(period==="week")return getWeekKey(e.date)===key;if(period==="month")return getMonthKey(e.date)===key;if(period==="year")return getYearKey(e.date)===key;return false;});}
-  const expKey=expPeriod==="day"?expDate:expPeriod==="week"?getWeekKey(expDate):expPeriod==="month"?getMonthKey(expDate):getYearKey(expDate);
-  const filteredExp=getExpFiltered(expPeriod,expKey);
-  const expTotal=filteredExp.reduce((s,e)=>s+e.amount,0);
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(""),2600);}
 
@@ -428,7 +404,7 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
   const todayTxs=getFiltered("day",getTodayKey()),todayTotal=todayTxs.reduce((s,t)=>s+t.total,0);
   const monthTotal=getFiltered("month",getMonthKey(getTodayKey())).reduce((s,t)=>s+t.total,0);
   const yearTotal=getFiltered("year",getYearKey(getTodayKey())).reduce((s,t)=>s+t.total,0);
-  const navItems=[{key:"dashboard",label:"ড্যাশবোর্ড",icon:"📊"},{key:"services",label:"সেবা যোগ",icon:"➕"},{key:"report",label:"রিপোর্ট",icon:"📋"},{key:"expense",label:"খরচ হিসাব",icon:"💸"},{key:"manage",label:"সেবা সম্পাদনা",icon:"⚙️"}];
+  const navItems=[{key:"dashboard",label:"ড্যাশবোর্ড",icon:"📊"},{key:"services",label:"সেবা যোগ",icon:"➕"},{key:"report",label:"রিপোর্ট",icon:"📋"},{key:"manage",label:"সেবা সম্পাদনা",icon:"⚙️"}];
   const bs=(a)=>({padding:"10px 20px",border:`2px solid ${a?C.g:C.b}`,borderRadius:9,background:a?C.g:C.w,color:a?"#fff":C.t,fontWeight:600,cursor:"pointer",fontSize:14,fontFamily:"inherit",transition:"all .2s"});
   const inp={width:"100%",padding:"11px 14px",border:`1.5px solid ${C.b}`,borderRadius:10,fontSize:14,fontFamily:"inherit",background:"#fafcfa"};
   const TH=({c})=><th style={{padding:"11px 14px",color:"#fff",textAlign:"left",fontSize:13,fontWeight:600,background:C.g}}>{c}</th>;
@@ -493,44 +469,14 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
           <p style={{textAlign:"center",fontSize:12,color:C.m,marginTop:12}}>বিনামূল্যে অ্যাকাউন্ট তৈরি করুন ✅</p>
         </div>
       </div>
-      {/* ফুটার - লগইন পেজ */}
+      {/* ফুটার */}
       <footer style={{background:C.gd,color:"rgba(255,255,255,0.75)",padding:"28px 20px 16px",marginTop:0}}>
-        <div style={{maxWidth:960,margin:"0 auto"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:24,marginBottom:20}}>
-            <div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <span style={{fontSize:20}}>🏪</span>
-                <span style={{color:"#fff",fontWeight:700,fontSize:14}}>ডিজিটাল সেবা কেন্দ্র</span>
-              </div>
-              <p style={{fontSize:12,lineHeight:1.7,color:"rgba(255,255,255,0.5)",margin:0}}>সকল সরকারি ও ডিজিটাল সেবার হিসাব এক জায়গায়।</p>
-            </div>
-            <div>
-              <div style={{color:"#fff",fontWeight:700,fontSize:13,marginBottom:10}}>যোগাযোগ ও সাপোর্ট</div>
-              <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                <a href="https://wa.me/8801888106184" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <svg viewBox="0 0 24 24" fill="#25D366" width="15" height="15"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                  WhatsApp সাপোর্ট
-                </a>
-                <a href="mailto:najimuddin3911@gmail.com" style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <span>✉️</span> najimuddin3911@gmail.com
-                </a>
-                <a href="https://www.facebook.com/profile.php?id=100094363264961" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <span style={{fontSize:14}}>📘</span> Facebook
-                </a>
-                <a href="https://youtube.com/@webitbangla?si=KLd4vFE8xN317j5p" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <span style={{color:"#FF0000",fontSize:14}}>▶</span> YouTube
-                </a>
-              </div>
-            </div>
+        <div style={{maxWidth:960,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:20}}>🏪</span>
+            <span style={{color:"#fff",fontWeight:700,fontSize:14}}>ডিজিটাল সেবা কেন্দ্র</span>
           </div>
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.12)",paddingTop:12,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-            <p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.35)"}}>© {new Date().getFullYear()} ডিজিটাল সেবা কেন্দ্র। সর্বস্বত্ব সংরক্ষিত।</p>
-            <p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.35)"}}>🇧🇩 বাংলাদেশ</p>
-          </div>
+          <p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.35)"}}>© {new Date().getFullYear()} সর্বস্বত্ব সংরক্ষিত 🇧🇩</p>
         </div>
       </footer>
     </div>
@@ -583,7 +529,7 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
       </div>
       {showAuthModal&&!user&&null}
 
-      {/* ফুটার - পাবলিক পেজ */}
+      {/* ফুটার */}
       <footer style={{background:C.gd,color:"rgba(255,255,255,0.75)",marginTop:48,padding:"36px 20px 20px"}}>
         <div style={{maxWidth:960,margin:"0 auto"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:28,marginBottom:28}}>
@@ -595,29 +541,17 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
               </div>
               <p style={{fontSize:12,lineHeight:1.7,color:"rgba(255,255,255,0.55)",margin:0}}>সকল সরকারি ও ডিজিটাল সেবার হিসাব এক জায়গায়। বিনামূল্যে, নিরাপদ ও সহজে।</p>
             </div>
-            {/* যোগাযোগ */}
+            {/* দ্রুত লিংক */}
             <div>
-              <div style={{color:"#fff",fontWeight:700,fontSize:13,marginBottom:12}}>যোগাযোগ ও সাপোর্ট</div>
-              <div style={{display:"flex",flexDirection:"column",gap:9}}>
-                <a href="https://wa.me/8801888106184" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <svg viewBox="0 0 24 24" fill="#25D366" width="16" height="16"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                  WhatsApp সাপোর্ট
-                </a>
-                <a href="mailto:najimuddin3911@gmail.com" style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <span>✉️</span> najimuddin3911@gmail.com
-                </a>
-                <a href="https://www.facebook.com/profile.php?id=100094363264961" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <span style={{fontSize:15}}>📘</span> Facebook পেজ
-                </a>
-                <a href="https://youtube.com/@webitbangla?si=KLd4vFE8xN317j5p" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(255,255,255,0.65)",textDecoration:"none"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.65)"}>
-                  <span style={{color:"#FF0000",fontSize:15}}>▶</span> YouTube চ্যানেল
-                </a>
-              </div>
+              <div style={{color:"#fff",fontWeight:700,fontSize:13,marginBottom:10}}>দ্রুত অ্যাকসেস</div>
+              {[{label:"📊 ড্যাশবোর্ড",mode:"login"},{label:"➕ সেবা যোগ",mode:"login"},{label:"📋 রিপোর্ট",mode:"login"},{label:"⚙️ সেবা সম্পাদনা",mode:"login"}].map(l=>(
+                <div key={l.label} onClick={()=>openAuth(l.mode)} style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginBottom:7,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"color .2s"}}
+                  onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.6)"}>
+                  {l.label}
+                </div>
+              ))}
             </div>
+
           </div>
           {/* নিচের বার */}
           <div style={{borderTop:"1px solid rgba(255,255,255,0.12)",paddingTop:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
@@ -663,19 +597,29 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
         {/* ড্যাশবোর্ড */}
         {tab==="dashboard"&&(
           <div className="fade-in">
-            {/* স্ট্যাট কার্ড */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:22}}>
-              {[
-                {label:"আজকের আয়",value:`৳${bn(todayTotal)}`,sub:`${bn(todayTxs.length)} টি এন্ট্রি`,accent:true},
-                {label:"মাসিক আয়",value:`৳${bn(monthTotal)}`,sub:getMonthKey(getTodayKey()),accent:false},
-                {label:"বার্ষিক আয়",value:`৳${bn(yearTotal)}`,sub:getYearKey(getTodayKey())+" সাল",accent:false},
-              ].map((s,i)=>(
-                <div key={i} className="card-hover" style={{background:s.accent?C.g:C.w,border:`2px solid ${s.accent?C.gd:C.b}`,borderRadius:13,padding:"18px",transition:"all .2s",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                  <p style={{margin:"0 0 5px",fontSize:11,color:s.accent?"rgba(255,255,255,0.65)":C.m,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>{s.label}</p>
-                  <p style={{margin:"0 0 3px",fontSize:24,fontWeight:700,color:s.accent?"#fff":C.g}}>{s.value}</p>
-                  <p style={{margin:0,fontSize:11,color:s.accent?"rgba(255,255,255,0.45)":C.b}}>{s.sub}</p>
+            {/* ঘড়ি ও ক্যালেন্ডার রো */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:14,marginBottom:22,alignItems:"start"}}>
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                <LiveClock/>
+                {/* স্ট্যাট কার্ড */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+                  {[
+                    {label:"আজকের আয়",value:`৳${bn(todayTotal)}`,sub:`${bn(todayTxs.length)} টি এন্ট্রি`,accent:true},
+                    {label:"মাসিক আয়",value:`৳${bn(monthTotal)}`,sub:getMonthKey(getTodayKey()),accent:false},
+                    {label:"বার্ষিক আয়",value:`৳${bn(yearTotal)}`,sub:getYearKey(getTodayKey())+" সাল",accent:false},
+                  ].map((s,i)=>(
+                    <div key={i} className="card-hover" style={{background:s.accent?C.g:C.w,border:`2px solid ${s.accent?C.gd:C.b}`,borderRadius:13,padding:"18px",transition:"all .2s",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                      <p style={{margin:"0 0 5px",fontSize:11,color:s.accent?"rgba(255,255,255,0.65)":C.m,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>{s.label}</p>
+                      <p style={{margin:"0 0 3px",fontSize:24,fontWeight:700,color:s.accent?"#fff":C.g}}>{s.value}</p>
+                      <p style={{margin:0,fontSize:11,color:s.accent?"rgba(255,255,255,0.45)":C.b}}>{s.sub}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+              {/* ক্যালেন্ডার */}
+              <div style={{minWidth:220,maxWidth:260}}>
+                <MiniCalendar transactions={transactions}/>
+              </div>
             </div>
 
             {/* আজকের এন্ট্রি */}
@@ -734,20 +678,11 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
               :<>
                 <div style={{background:C.w,border:`1.5px solid ${C.b}`,borderRadius:12,overflow:"hidden",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
                   <table style={{width:"100%",borderCollapse:"collapse"}}>
-                    <thead><tr>{["ক্রমিক","তারিখ","সেবার নাম","সংখ্যা","একক মূল্য","মোট"].map(h=><TH key={h} c={h}/>)}</tr></thead>
+                    <thead><tr>{["ক্রমিক","সেবার নাম","সংখ্যা","একক মূল্য","মোট"].map(h=><TH key={h} c={h}/>)}</tr></thead>
                     <tbody>
-                      {rTxs.map((tx,i)=>(
-                        <tr key={tx.id||i}>
-                          <TD c={bn(i+1)} i={i}/>
-                          <TD c={formatDate(tx.date)} i={i}/>
-                          <TD c={tx.serviceName} i={i}/>
-                          <TD c={bn(tx.qty)} i={i}/>
-                          <TD c={`৳${bn(tx.price)}`} i={i}/>
-                          <TD c={`৳${bn(tx.total)}`} i={i} bold/>
-                        </tr>
-                      ))}
+                      {rGr.map((r,i)=>(<tr key={i}><TD c={bn(i+1)} i={i}/><TD c={r.name} i={i}/><TD c={bn(r.qty)} i={i}/><TD c={`৳${bn(r.price)}`} i={i}/><TD c={`৳${bn(r.total)}`} i={i} bold/></tr>))}
                       <tr style={{borderTop:`2px solid ${C.g}`}}>
-                        <td colSpan={5} style={{padding:"12px 14px",fontWeight:700,fontSize:14,background:C.gbg,color:C.g}}>মোট আয়</td>
+                        <td colSpan={4} style={{padding:"12px 14px",fontWeight:700,fontSize:14,background:C.gbg,color:C.g}}>মোট আয়</td>
                         <td style={{padding:"12px 14px",fontWeight:700,fontSize:16,background:C.gbg,color:C.g}}>৳{bn(rTotal)}</td>
                       </tr>
                     </tbody>
@@ -755,84 +690,6 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
                 </div>
                 <button onClick={()=>printInvoice(rPeriod,rKey)} style={bs(true)}>🖨️ ইনভয়েস প্রিন্ট / PDF করুন</button>
               </>
-            }
-          </div>
-        )}
-
-        {/* খরচ হিসাব */}
-        {tab==="expense"&&(
-          <div className="fade-in">
-            <h2 style={{margin:"0 0 6px",fontSize:20,fontWeight:700,color:C.g}}>💸 খরচের হিসাব</h2>
-            <p style={{color:C.m,fontSize:13,margin:"0 0 18px"}}>দৈনিক, সাপ্তাহিক, মাসিক ও বার্ষিক খরচ ট্র্যাক করুন।</p>
-
-            {/* নতুন খরচ যোগ */}
-            <div style={{background:C.gbg,border:`2px dashed ${C.g}`,borderRadius:14,padding:"16px",marginBottom:20}}>
-              <div style={{fontWeight:700,fontSize:13,color:C.g,marginBottom:12}}>➕ নতুন খরচ যোগ করুন</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:9}}>
-                <div>
-                  <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>পরিমাণ (৳) *</label>
-                  <input type="number" placeholder="যেমন: ৫০০" value={expForm.amount} onChange={e=>setExpForm(f=>({...f,amount:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
-                </div>
-                <div>
-                  <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>কী কিনলেন / কোথায় খরচ *</label>
-                  <input type="text" placeholder="যেমন: ইন্টারনেট বিল" value={expForm.desc} onChange={e=>setExpForm(f=>({...f,desc:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
-                </div>
-                <div>
-                  <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>ক্যাটাগরি</label>
-                  <select value={expForm.category} onChange={e=>setExpForm(f=>({...f,category:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}>
-                    <option value="">সাধারণ</option>
-                    <option value="অফিস খরচ">অফিস খরচ</option>
-                    <option value="যানবাহন">যানবাহন</option>
-                    <option value="খাদ্য">খাদ্য</option>
-                    <option value="ইন্টারনেট/ফোন">ইন্টারনেট/ফোন</option>
-                    <option value="বিদ্যুৎ/পানি">বিদ্যুৎ/পানি</option>
-                    <option value="বেতন">বেতন</option>
-                    <option value="অন্যান্য">অন্যান্য</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>তারিখ</label>
-                  <input type="date" value={expForm.date} onChange={e=>setExpForm(f=>({...f,date:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
-                </div>
-              </div>
-              <button onClick={addExpense} style={{...bs(true),marginTop:12,padding:"10px 22px"}}>✅ খরচ যোগ করুন</button>
-            </div>
-
-            {/* ফিল্টার */}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-              {[["day","দৈনিক"],["week","সাপ্তাহিক"],["month","মাসিক"],["year","বার্ষিক"]].map(([k,l])=>(
-                <button key={k} onClick={()=>setExpPeriod(k)} style={{...bs(expPeriod===k),borderRadius:20,padding:"8px 18px"}}>{l}</button>
-              ))}
-            </div>
-            <div style={{marginBottom:16}}>
-              <input type="date" value={expDate} onChange={e=>setExpDate(e.target.value)} style={{padding:"9px 14px",border:`2px solid ${C.b}`,borderRadius:9,fontSize:14,fontFamily:"inherit"}}/>
-            </div>
-
-            {/* সারসংক্ষেপ */}
-            <div style={{background:C.g,borderRadius:13,padding:"16px 20px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:"rgba(255,255,255,0.75)",fontSize:13,fontWeight:600}}>মোট খরচ ({["day","week","month","year"].indexOf(expPeriod)>=0?["দৈনিক","সাপ্তাহিক","মাসিক","বার্ষিক"][["day","week","month","year"].indexOf(expPeriod)]:""})</span>
-              <span style={{color:"#fff",fontSize:22,fontWeight:700}}>৳{bn(expTotal)}</span>
-            </div>
-
-            {/* তালিকা */}
-            {filteredExp.length===0
-              ?<div style={{background:C.w,border:`2px dashed ${C.b}`,borderRadius:12,padding:"36px",textAlign:"center",color:C.m}}>এই সময়ের জন্য কোনো খরচ নেই</div>
-              :<div style={{background:C.w,border:`1.5px solid ${C.b}`,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                <table style={{width:"100%",borderCollapse:"collapse"}}>
-                  <thead><tr>{["তারিখ","কী খরচ হয়েছে","ক্যাটাগরি","পরিমাণ",""].map(h=><TH key={h} c={h}/>)}</tr></thead>
-                  <tbody>{[...filteredExp].reverse().map((ex,i)=>(
-                    <tr key={ex.id}>
-                      <TD c={formatDate(ex.date)} i={i}/>
-                      <TD c={ex.desc} i={i}/>
-                      <TD c={ex.category||"সাধারণ"} i={i}/>
-                      <TD c={`৳${bn(ex.amount)}`} i={i} bold/>
-                      <td style={{padding:"8px 10px",background:i%2===0?C.w:"#f5fbf7"}}>
-                        <button onClick={()=>deleteExpense(ex.id)} style={{background:"#fff5f5",border:"1px solid #e74c3c",color:"#e74c3c",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>🗑️</button>
-                      </td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
             }
           </div>
         )}
@@ -872,40 +729,25 @@ td{padding:9px 12px;border-bottom:1px solid #e0ede6;font-size:13px}tr:nth-child(
         </div>
       )}
 
-      {/* ফুটার - লগইন ড্যাশবোর্ড */}
+      {/* ফুটার */}
       <footer style={{background:C.gd,color:"rgba(255,255,255,0.6)",padding:"22px 20px",marginTop:32}}>
-        <div style={{maxWidth:960,margin:"0 auto"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:20,marginBottom:16}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:20}}>🏪</span>
-              <div>
-                <div style={{color:"#fff",fontWeight:700,fontSize:14,lineHeight:1.2}}>ডিজিটাল সেবা কেন্দ্র</div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>সকল সরকারি ও ডিজিটাল সেবা</div>
-              </div>
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"8px 20px",alignItems:"center"}}>
-              <a href="https://wa.me/8801888106184" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"none"}}
-                onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.55)"}>
-                <svg viewBox="0 0 24 24" fill="#25D366" width="13" height="13"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                WhatsApp
-              </a>
-              <a href="mailto:najimuddin3911@gmail.com" style={{fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"none"}}
-                onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.55)"}>
-                ✉️ Email
-              </a>
-              <a href="https://www.facebook.com/profile.php?id=100094363264961" target="_blank" rel="noopener" style={{fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"none"}}
-                onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.55)"}>
-                📘 Facebook
-              </a>
-              <a href="https://youtube.com/@webitbangla?si=KLd4vFE8xN317j5p" target="_blank" rel="noopener" style={{fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"none"}}
-                onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.55)"}>
-                <span style={{color:"#FF0000"}}>▶</span> YouTube
-              </a>
+        <div style={{maxWidth:960,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:20}}>🏪</span>
+            <div>
+              <div style={{color:"#fff",fontWeight:700,fontSize:14,lineHeight:1.2}}>ডিজিটাল সেবা কেন্দ্র</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>সকল সরকারি ও ডিজিটাল সেবা এক জায়গায়</div>
             </div>
           </div>
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:10}}>
-            <p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.3)"}}>© {new Date().getFullYear()} সর্বস্বত্ব সংরক্ষিত 🇧🇩</p>
+          <div style={{display:"flex",gap:18,flexWrap:"wrap"}}>
+            {[{key:"dashboard",label:"📊 ড্যাশবোর্ড"},{key:"services",label:"➕ সেবা যোগ"},{key:"report",label:"📋 রিপোর্ট"},{key:"manage",label:"⚙️ সম্পাদনা"}].map(n=>(
+              <span key={n.key} onClick={()=>setTab(n.key)} style={{fontSize:12,color:"rgba(255,255,255,0.5)",cursor:"pointer",transition:"color .2s"}}
+                onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.5)"}>
+                {n.label}
+              </span>
+            ))}
           </div>
+          <p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.3)"}}>© {new Date().getFullYear()} সর্বস্বত্ব সংরক্ষিত 🇧🇩</p>
         </div>
       </footer>
     </div>
