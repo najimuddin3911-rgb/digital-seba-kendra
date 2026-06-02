@@ -781,7 +781,7 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
           <div className="fade-in">
             <h2 style={{margin:"0 0 6px",fontSize:20,fontWeight:700,color:C.g}}>➕ সেবা যোগ করুন</h2>
             <p style={{color:C.m,fontSize:13,margin:"0 0 18px"}}>যেকোনো সেবার বাটনে ক্লিক করুন, দাম/পরিমাণ ঠিক করে যোগ করুন।</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(205px,1fr))",gap:11}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(205px,1fr))",gap:11,marginBottom:28}}>
               {services.map(svc=>(
                 <button key={svc.id} className="svc-btn" onClick={()=>openAdd(svc)}
                   style={{background:C.w,border:`1.5px solid ${C.b}`,borderRadius:12,padding:"15px 13px",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
@@ -789,6 +789,44 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
                   <div style={{fontSize:19,fontWeight:700,color:C.g}}>৳{bn(svc.price)}</div>
                 </button>
               ))}
+            </div>
+
+            {/* নতুন খরচ যোগ ফর্ম */}
+            <div style={{background:C.w,border:`2px solid ${C.b}`,borderRadius:16,padding:"18px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                <span style={{fontSize:16}}>💸</span>
+                <h3 style={{margin:0,fontSize:16,fontWeight:700,color:C.g}}>নতুন খরচ যোগ করুন</h3>
+              </div>
+              <div style={{background:C.gbg,border:`2px dashed ${C.g}`,borderRadius:12,padding:"14px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
+                  <div>
+                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>পরিমাণ (৳) *</label>
+                    <input type="number" placeholder="যেমন: ৫০০" value={expForm.amount} onChange={e=>setExpForm(f=>({...f,amount:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
+                  </div>
+                  <div>
+                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>কী কিনলেন / কোথায় খরচ *</label>
+                    <input type="text" placeholder="যেমন: ইন্টারনেট বিল" value={expForm.desc} onChange={e=>setExpForm(f=>({...f,desc:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
+                  </div>
+                  <div>
+                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>ক্যাটাগরি</label>
+                    <select value={expForm.category} onChange={e=>setExpForm(f=>({...f,category:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}>
+                      <option value="">সাধারণ</option>
+                      <option value="অফিস খরচ">অফিস খরচ</option>
+                      <option value="যানবাহন">যানবাহন</option>
+                      <option value="খাদ্য">খাদ্য</option>
+                      <option value="ইন্টারনেট/ফোন">ইন্টারনেট/ফোন</option>
+                      <option value="বিদ্যুৎ/পানি">বিদ্যুৎ/পানি</option>
+                      <option value="বেতন">বেতন</option>
+                      <option value="অন্যান্য">অন্যান্য</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>তারিখ</label>
+                    <input type="date" value={expForm.date} onChange={e=>setExpForm(f=>({...f,date:e.target.value}))} style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.b}`,borderRadius:9,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
+                  </div>
+                </div>
+                <button onClick={addExpense} style={{...bs(true),marginTop:12,padding:"10px 22px"}}>✅ খরচ যোগ করুন</button>
+              </div>
             </div>
           </div>
         )}
@@ -866,39 +904,7 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
                 <span style={{fontSize:16}}>💸</span>
                 <h3 style={{margin:0,fontSize:16,fontWeight:700,color:C.g}}>খরচের হিসাব</h3>
-              </div>
-
-              {/* নতুন খরচ যোগ ফর্ম */}
-              <div style={{background:C.gbg,border:`2px dashed ${C.g}`,borderRadius:12,padding:"14px",marginBottom:18}}>
-                <div style={{fontWeight:700,fontSize:13,color:C.g,marginBottom:10}}>➕ নতুন খরচ যোগ করুন</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
-                  <div>
-                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>পরিমাণ (৳) *</label>
-                    <input type="number" placeholder="যেমন: ৫০০" value={expForm.amount} onChange={e=>setExpForm(f=>({...f,amount:e.target.value}))} style={{width:"100%",padding:"8px 10px",border:`1.5px solid ${C.b}`,borderRadius:8,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
-                  </div>
-                  <div>
-                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>কী কিনলেন / কোথায় খরচ *</label>
-                    <input type="text" placeholder="যেমন: ইন্টারনেট বিল" value={expForm.desc} onChange={e=>setExpForm(f=>({...f,desc:e.target.value}))} style={{width:"100%",padding:"8px 10px",border:`1.5px solid ${C.b}`,borderRadius:8,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
-                  </div>
-                  <div>
-                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>ক্যাটাগরি</label>
-                    <select value={expForm.category} onChange={e=>setExpForm(f=>({...f,category:e.target.value}))} style={{width:"100%",padding:"8px 10px",border:`1.5px solid ${C.b}`,borderRadius:8,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}>
-                      <option value="">সাধারণ</option>
-                      <option value="অফিস খরচ">অফিস খরচ</option>
-                      <option value="যানবাহন">যানবাহন</option>
-                      <option value="খাদ্য">খাদ্য</option>
-                      <option value="ইন্টারনেট/ফোন">ইন্টারনেট/ফোন</option>
-                      <option value="বিদ্যুৎ/পানি">বিদ্যুৎ/পানি</option>
-                      <option value="বেতন">বেতন</option>
-                      <option value="অন্যান্য">অন্যান্য</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{display:"block",fontSize:11,color:C.m,marginBottom:3,fontWeight:600}}>তারিখ</label>
-                    <input type="date" value={expForm.date} onChange={e=>setExpForm(f=>({...f,date:e.target.value}))} style={{width:"100%",padding:"8px 10px",border:`1.5px solid ${C.b}`,borderRadius:8,fontSize:13,fontFamily:"inherit",background:"#fafcfa"}}/>
-                  </div>
-                </div>
-                <button onClick={addExpense} style={{...bs(true),marginTop:10,padding:"9px 20px",fontSize:13}}>✅ খরচ যোগ করুন</button>
+                <span onClick={()=>setTab("services")} style={{fontSize:12,fontWeight:500,color:C.g,cursor:"pointer",marginLeft:"auto",textDecoration:"underline"}}>➕ নতুন খরচ যোগ করুন →</span>
               </div>
 
               {/* ফিল্টার */}
