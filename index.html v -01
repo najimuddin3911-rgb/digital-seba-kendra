@@ -325,7 +325,7 @@ function App(){
   const [rDate,setRDate]=useState(getTodayKey());
   const [showAuthModal,setShowAuthModal]=useState(false);
   const [authInitMode,setAuthInitMode]=useState("login");
-  const [expenses,setExpenses]=useState(()=>{try{return JSON.parse(localStorage.getItem("dsExpenses"))||[];}catch{return [];}});
+  const [expenses,setExpenses]=useState([]);
   const [expForm,setExpForm]=useState({amount:"",desc:"",category:"",date:getTodayKey()});
   const [expPeriod,setExpPeriod]=useState("day");
   const [expDate,setExpDate]=useState(getTodayKey());
@@ -333,26 +333,34 @@ function App(){
   useEffect(()=>{
     if(!user)return;
     const uid=safeKey(user.contact);setLoading(true);
-    Promise.all([fbGet(`users/${uid}/services`),fbGet(`users/${uid}/transactions`)]).then(([svcs,txs])=>{
+    Promise.all([fbGet(`users/${uid}/services`),fbGet(`users/${uid}/transactions`),fbGet(`users/${uid}/expenses`)]).then(([svcs,txs,exs])=>{
       if(svcs&&Array.isArray(svcs))setServices(svcs);
       else if(svcs&&typeof svcs==='object'&&!Array.isArray(svcs))setServices(Object.values(svcs));
       if(txs&&typeof txs==='object'){const arr=Object.entries(txs).map(([k,v])=>({...v,fbKey:k}));setTransactions(arr.sort((a,b)=>a.id-b.id));}
       else setTransactions([]);
+      if(exs&&typeof exs==='object'){const arr=Object.entries(exs).map(([k,v])=>({...v,fbKey:k}));setExpenses(arr.sort((a,b)=>a.id-b.id));}
+      else setExpenses([]);
       setLoading(false);
     }).catch(()=>setLoading(false));
   },[user]);
 
   useEffect(()=>{if(!user)return;fbSet(`users/${safeKey(user.contact)}/services`,services);},[services]);
-  useEffect(()=>{localStorage.setItem("dsExpenses",JSON.stringify(expenses));},[expenses]);
+  // expenses Firebase-এ save — localStorage নয়
 
-  function addExpense(){
+  async function addExpense(){
     if(!expForm.amount||!expForm.desc){showToast("❌ পরিমাণ ও বিবরণ লিখুন");return;}
     const ex={id:Date.now(),date:expForm.date||getTodayKey(),amount:parseFloat(expForm.amount)||0,desc:expForm.desc,category:expForm.category||"সাধারণ"};
-    setExpenses(p=>[...p,ex]);
+    const result=await fbPush(`users/${safeKey(user.contact)}/expenses`,ex);
+    setExpenses(p=>[...p,{...ex,fbKey:result.name}]);
     setExpForm({amount:"",desc:"",category:"",date:getTodayKey()});
     showToast(`✅ খরচ যোগ হয়েছে: ৳${ex.amount}`);
   }
-  function deleteExpense(id){if(!window.confirm("এই খরচ মুছবেন?"))return;setExpenses(p=>p.filter(e=>e.id!==id));}
+  async function deleteExpense(id){
+    if(!window.confirm("এই খরচ মুছবেন?"))return;
+    const ex=expenses.find(e=>e.id===id);
+    if(ex&&ex.fbKey) await fetch(`${FIREBASE_URL}/users/${safeKey(user.contact)}/expenses/${ex.fbKey}.json`,{method:'DELETE'});
+    setExpenses(p=>p.filter(e=>e.id!==id));
+  }
   function getExpFiltered(period,key){return expenses.filter(e=>{if(period==="day")return e.date===key;if(period==="week")return getWeekKey(e.date)===key;if(period==="month")return getMonthKey(e.date)===key;if(period==="year")return getYearKey(e.date)===key;return false;});}
   const expKey=expPeriod==="day"?expDate:expPeriod==="week"?getWeekKey(expDate):expPeriod==="month"?getMonthKey(expDate):getYearKey(expDate);
   const filteredExp=getExpFiltered(expPeriod,expKey);
@@ -382,7 +390,7 @@ function App(){
     }catch{setLerr("সংযোগ সমস্যা। আবার চেষ্টা করুন।");setLoading(false);}
   }
 
-  function handleLogout(){localStorage.removeItem("dsUser");setUser(null);setTransactions([]);setServices(DEFAULT_SERVICES);}
+  function handleLogout(){localStorage.removeItem("dsUser");setUser(null);setTransactions([]);setServices(DEFAULT_SERVICES);setExpenses([]);}
 
   function openAdd(svc){if(!user){openAuth("login");return;}setEditSvc(svc);setEQty(1);setEPrice(String(svc.price));setEName(svc.name);}
 
