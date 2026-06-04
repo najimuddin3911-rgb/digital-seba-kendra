@@ -92,13 +92,13 @@ const HADITH=[
   {t:"মানুষের সাথে লেনদেনে যে ব্যক্তি তাদের ক্ষতি করে না, সে উত্তম মুসলমান।",s:"আহমাদ"},
 ];
 
-function getTodayKey(){return new Date().toISOString().split("T")[0];}
+function getTodayKey(){const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),dy=String(d.getDate()).padStart(2,"0");return y+"-"+m+"-"+dy;}
 function getMonthKey(d){return d.slice(0,7);}
 function getYearKey(d){return d.slice(0,4);}
-function getWeekKey(d){const dt=new Date(d);dt.setDate(dt.getDate()-dt.getDay());return dt.toISOString().split("T")[0];}
+function getWeekKey(d){const dt=new Date(d+"T00:00:00");dt.setDate(dt.getDate()-dt.getDay());const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,"0"),dy=String(dt.getDate()).padStart(2,"0");return y+"-"+m+"-"+dy;}
 function formatDate(d){return new Date(d).toLocaleDateString("bn-BD",{year:"numeric",month:"long",day:"numeric"});}
 function bn(n){return Number(n).toLocaleString("bn-BD");}
-function safeKey(s){return s.replace(/[.#$\[\]@]/g,'_');}
+function safeKey(s){return s.trim().replace(/[.#$\[\]@]/g,'_');}
 
 function PassInput({placeholder,value,onChange,required,autoComplete}){
   const [show,setShow]=useState(false);
