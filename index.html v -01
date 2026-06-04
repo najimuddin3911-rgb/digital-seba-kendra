@@ -329,9 +329,11 @@ function App(){
   const [expForm,setExpForm]=useState({amount:"",desc:"",category:"",date:getTodayKey()});
   const [expPeriod,setExpPeriod]=useState("day");
   const [expDate,setExpDate]=useState(getTodayKey());
+  const [dataLoaded,setDataLoaded]=useState(false);
 
   useEffect(()=>{
     if(!user)return;
+    setDataLoaded(false);
     const uid=safeKey(user.contact);setLoading(true);
     Promise.all([fbGet(`users/${uid}/services`),fbGet(`users/${uid}/transactions`),fbGet(`users/${uid}/expenses`)]).then(([svcs,txs,exs])=>{
       if(svcs&&Array.isArray(svcs))setServices(svcs);
@@ -341,10 +343,12 @@ function App(){
       if(exs&&typeof exs==='object'){const arr=Object.entries(exs).map(([k,v])=>({...v,fbKey:k}));setExpenses(arr.sort((a,b)=>a.id-b.id));}
       else setExpenses([]);
       setLoading(false);
-    }).catch(()=>setLoading(false));
+      setDataLoaded(true);
+    }).catch(()=>{setLoading(false);setDataLoaded(true);});
   },[user]);
 
-  useEffect(()=>{if(!user)return;fbSet(`users/${safeKey(user.contact)}/services`,services);},[services]);
+  // services শুধু তখনই Firebase-এ save করবে যখন data আগে লোড হয়ে গেছে
+  useEffect(()=>{if(!user||!dataLoaded)return;fbSet(`users/${safeKey(user.contact)}/services`,services);},[services,dataLoaded]);
   // expenses Firebase-এ save — localStorage নয়
 
   async function addExpense(){
