@@ -21,6 +21,16 @@ const DEFAULT_SERVICES = [
 const ADMIN_CONTACT = "01888106184"; // Admin WhatsApp
 const ADMIN_EMAIL = "najimuddin3911@gmail.com";
 
+const DEFAULT_EXPENSE_CATS = [
+  { id: 101, name: "দোকান ভাড়া", price: 0 },
+  { id: 102, name: "বিদ্যুৎ বিল", price: 0 },
+  { id: 103, name: "ইন্টারনেট বিল", price: 0 },
+  { id: 104, name: "কাগজ ও কালি", price: 0 },
+  { id: 105, name: "যাতায়াত খরচ", price: 0 },
+  { id: 106, name: "চা/নাস্তা খরচ", price: 0 },
+  { id: 107, name: "অন্যান্য খরচ", price: 0 },
+];
+
 // ===== HELPERS =====
 function getTodayKey() { return new Date().toISOString().split("T")[0]; }
 function bn(n) { return Number(n).toLocaleString("bn-BD"); }
@@ -59,6 +69,9 @@ const USER_KEY     = "shop_user";
 const USERS_KEY    = "shop_users";
 const SERVICES_KEY = "shop_services";
 const ADMINS_KEY   = "shop_admins";
+const EXPENSE_KEY  = "shop_expenses";
+const EXPCATS_KEY  = "shop_expense_cats";
+const SEEN_USERS_KEY = "shop_seen_users_count";
 
 // ===== STYLES =====
 const S = {
@@ -91,6 +104,12 @@ export default function App() {
   const [transactions, setTransactions] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
   });
+  const [expenses, setExpenses] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(EXPENSE_KEY)) || []; } catch { return []; }
+  });
+  const [expenseCats, setExpenseCats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(EXPCATS_KEY)) || DEFAULT_EXPENSE_CATS; } catch { return DEFAULT_EXPENSE_CATS; }
+  });
 
   const [tab, setTab] = useState("dashboard");
   const [loginForm, setLoginForm] = useState({ contact: "", pass: "" });
@@ -109,23 +128,34 @@ export default function App() {
   // Report states
   const [reportPeriod, setReportPeriod] = useState("day");
   const [reportDate, setReportDate] = useState(getTodayKey());
+  const [reportType, setReportType] = useState("income"); // income | expense
 
   // History drill-down
   const [historyView, setHistoryView] = useState("years"); // years | months | weeks | days
   const [historyYear, setHistoryYear] = useState(null);
   const [historyMonth, setHistoryMonth] = useState(null);
   const [historyWeek, setHistoryWeek] = useState(null);
+  const [historyType, setHistoryType] = useState("income"); // income | expense
+
+  const [analyticsType, setAnalyticsType] = useState("income"); // income | expense
 
   // Service management
   const [newSvcName, setNewSvcName] = useState("");
   const [newSvcPrice, setNewSvcPrice] = useState("");
 
+  // Expense category management
+  const [newExpName, setNewExpName] = useState("");
+  const [newExpPrice, setNewExpPrice] = useState("");
+
   // Admin
   const [adminNewContact, setAdminNewContact] = useState("");
+  const [, forceTick] = useState(0); // small helper to force re-render after localStorage-only updates
 
   // ===== EFFECTS =====
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem(SERVICES_KEY, JSON.stringify(services)); }, [services]);
+  useEffect(() => { localStorage.setItem(EXPENSE_KEY, JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem(EXPCATS_KEY, JSON.stringify(expenseCats)); }, [expenseCats]);
 
   // ===== HELPERS =====
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2800); }
@@ -133,9 +163,11 @@ export default function App() {
   function getUsers() { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; } }
   function getAdmins() { try { return JSON.parse(localStorage.getItem(ADMINS_KEY)) || [ADMIN_CONTACT, ADMIN_EMAIL]; } catch { return [ADMIN_CONTACT, ADMIN_EMAIL]; } }
   function isAdmin(u) { if (!u) return false; return getAdmins().includes(u.contact); }
+  function getSeenUserCount() { try { return parseInt(localStorage.getItem(SEEN_USERS_KEY)) || 0; } catch { return 0; } }
+  function markUsersSeen(n) { localStorage.setItem(SEEN_USERS_KEY, String(n)); forceTick(t => t + 1); }
 
-  function getFiltered(period, key) {
-    return transactions.filter(tx => {
+  function getFiltered(list, period, key) {
+    return list.filter(tx => {
       if (period === "day") return tx.date === key;
       if (period === "week") return getWeekKey(tx.date) === key;
       if (period === "month") return getMonthKey(tx.date) === key;
@@ -144,23 +176,31 @@ export default function App() {
     });
   }
 
-  function groupByService(txs) {
+  function groupByItem(txs, field = "serviceName") {
     const map = {};
     txs.forEach(tx => {
-      if (!map[tx.serviceName]) map[tx.serviceName] = { name: tx.serviceName, qty: 0, total: 0, price: tx.price };
-      map[tx.serviceName].qty += tx.qty;
-      map[tx.serviceName].total += tx.total;
+      const k = tx[field];
+      if (!map[k]) map[k] = { name: k, qty: 0, total: 0, price: tx.price };
+      map[k].qty += tx.qty;
+      map[k].total += tx.total;
     });
     return Object.values(map).sort((a, b) => b.total - a.total);
   }
+  function groupByService(txs) { return groupByItem(txs, "serviceName"); }
 
   function sumTotal(txs) { return txs.reduce((s, t) => s + t.total, 0); }
 
-  // All unique years/months/weeks/days from transactions
-  const allYears = [...new Set(transactions.map(t => getYearKey(t.date)))].sort().reverse();
-  const allMonths = (year) => [...new Set(transactions.filter(t => getYearKey(t.date) === year).map(t => getMonthKey(t.date)))].sort().reverse();
-  const allWeeks = (month) => [...new Set(transactions.filter(t => getMonthKey(t.date) === month).map(t => getWeekKey(t.date)))].sort().reverse();
-  const allDays = (week) => [...new Set(transactions.filter(t => getWeekKey(t.date) === week).map(t => t.date))].sort().reverse();
+  // Generic year/month/week/day listers — pass any list (income or expense)
+  function uniqYears(list) { return [...new Set(list.map(t => getYearKey(t.date)))].sort().reverse(); }
+  function uniqMonths(list, year) { return [...new Set(list.filter(t => getYearKey(t.date) === year).map(t => getMonthKey(t.date)))].sort().reverse(); }
+  function uniqWeeks(list, month) { return [...new Set(list.filter(t => getMonthKey(t.date) === month).map(t => getWeekKey(t.date)))].sort().reverse(); }
+  function uniqDays(list, week) { return [...new Set(list.filter(t => getWeekKey(t.date) === week).map(t => t.date))].sort().reverse(); }
+
+  // All unique years/months/weeks/days from income transactions (kept for backward-compat)
+  const allYears = uniqYears(transactions);
+  const allMonths = (year) => uniqMonths(transactions, year);
+  const allWeeks = (month) => uniqWeeks(transactions, month);
+  const allDays = (week) => uniqDays(transactions, week);
 
   // ===== AUTH =====
   function handleAuth(e) {
@@ -204,12 +244,19 @@ export default function App() {
 
   function handleLogout() { localStorage.removeItem(USER_KEY); setUser(null); }
 
-  // ===== SERVICE SALE =====
-  function addService(svc) { setEditService(svc); setEditQty(1); setEditPrice(String(svc.price)); setEditName(svc.name); }
+  // ===== SERVICE / EXPENSE ENTRY =====
+  function addService(svc, kind = "income") { setEditService({ ...svc, kind }); setEditQty(1); setEditPrice(String(svc.price || "")); setEditName(svc.name); }
 
   function confirmAdd() {
     const qty = parseInt(editQty) || 1;
     const price = parseFloat(editPrice) || 0;
+    if (editService.kind === "expense") {
+      const tx = { id: Date.now(), date: getTodayKey(), name: editName, qty, price, total: qty * price };
+      setExpenses(prev => [...prev, tx]);
+      setEditService(null);
+      showToast(`✅ খরচ "${editName}" যোগ হয়েছে`);
+      return;
+    }
     const tx = { id: Date.now(), date: getTodayKey(), serviceId: editService.id, serviceName: editName, qty, price, total: qty * price };
     setTransactions(prev => [...prev, tx]);
     setEditService(null);
@@ -217,8 +264,8 @@ export default function App() {
   }
 
   // ===== PRINT =====
-  function printReport(txs, title, subtitle) {
-    const grouped = groupByService(txs);
+  function printReport(txs, title, subtitle, field = "serviceName", labelWord = "আয়") {
+    const grouped = groupByItem(txs, field);
     const total = sumTotal(txs);
     const w = window.open("", "_blank");
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -243,10 +290,10 @@ export default function App() {
   <span class="badge">${title} — ${subtitle}</span>
 </div>
 <table>
-<thead><tr><th>#</th><th>সেবার নাম</th><th>সংখ্যা</th><th>একক মূল্য</th><th>মোট</th></tr></thead>
+<thead><tr><th>#</th><th>${field === "name" ? "খরচের খাত" : "সেবার নাম"}</th><th>সংখ্যা</th><th>একক মূল্য</th><th>মোট</th></tr></thead>
 <tbody>
 ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td><td>৳${r.price}</td><td>৳${r.total}</td></tr>`).join("")}
-<tr class="total-row"><td colspan="4">মোট আয়</td><td>৳${total}</td></tr>
+<tr class="total-row"><td colspan="4">মোট ${labelWord}</td><td>৳${total}</td></tr>
 </tbody></table>
 <div class="footer">মুদ্রণ তারিখ: ${new Date().toLocaleString("bn-BD")} | ধন্যবাদ সেবা গ্রহণ করার জন্য</div>
 <script>window.onload=()=>window.print();<\/script>
@@ -255,10 +302,15 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
   }
 
   // ===== COMPUTED =====
-  const todayTxs = getFiltered("day", getTodayKey());
+  const todayTxs = getFiltered(transactions, "day", getTodayKey());
   const todayTotal = sumTotal(todayTxs);
-  const monthTotal = sumTotal(getFiltered("month", getMonthKey(getTodayKey())));
-  const yearTotal = sumTotal(getFiltered("year", getYearKey(getTodayKey())));
+  const monthTotal = sumTotal(getFiltered(transactions, "month", getMonthKey(getTodayKey())));
+  const yearTotal = sumTotal(getFiltered(transactions, "year", getYearKey(getTodayKey())));
+
+  const todayExpTxs = getFiltered(expenses, "day", getTodayKey());
+  const todayExpTotal = sumTotal(todayExpTxs);
+  const monthExpTotal = sumTotal(getFiltered(expenses, "month", getMonthKey(getTodayKey())));
+  const yearExpTotal = sumTotal(getFiltered(expenses, "year", getYearKey(getTodayKey())));
 
   const reportKey = (() => {
     if (reportPeriod === "day") return reportDate;
@@ -266,18 +318,23 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
     if (reportPeriod === "month") return getMonthKey(reportDate);
     return getYearKey(reportDate);
   })();
-  const reportTxs = getFiltered(reportPeriod, reportKey);
-  const reportGrouped = groupByService(reportTxs);
+  const reportList = reportType === "income" ? transactions : expenses;
+  const reportField = reportType === "income" ? "serviceName" : "name";
+  const reportTxs = getFiltered(reportList, reportPeriod, reportKey);
+  const reportGrouped = groupByItem(reportTxs, reportField);
   const reportTotal = sumTotal(reportTxs);
+
+  const newUsersCount = Math.max(0, getUsers().length - getSeenUserCount());
 
   const navItems = [
     { key: "dashboard", label: "ড্যাশবোর্ড", icon: "📊" },
-    { key: "services", label: "সেবা যোগ", icon: "➕" },
+    { key: "services", label: "সেবা যোগ (আয়)", icon: "➕" },
+    { key: "expenses", label: "খরচ যোগ", icon: "➖" },
     { key: "report", label: "রিপোর্ট", icon: "📋" },
     { key: "history", label: "সম্পূর্ণ ইতিহাস", icon: "📅" },
     { key: "analytics", label: "বিশ্লেষণ", icon: "📈" },
-    { key: "manage", label: "সেবা সম্পাদনা", icon: "⚙️" },
-    ...(isAdmin(user) ? [{ key: "admin", label: "অ্যাডমিন", icon: "🛡️" }] : []),
+    { key: "manage", label: "সম্পাদনা", icon: "⚙️" },
+    ...(isAdmin(user) ? [{ key: "admin", label: `অ্যাডমিন${newUsersCount > 0 ? ` (🔔${bn(newUsersCount)})` : ""}`, icon: "🛡️" }] : []),
   ];
 
   // ===== LOGIN PAGE =====
@@ -420,7 +477,7 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         {tab === "dashboard" && (
           <div>
             <h2 style={S.sectionTitle}>📊 আজকের সারসংক্ষেপ</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 28 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 18 }}>
               {[
                 { label: "আজকের আয়", value: `৳${bn(todayTotal)}`, sub: `${bn(todayTxs.length)} টি এন্ট্রি`, dark: true },
                 { label: "এই মাসের আয়", value: `৳${bn(monthTotal)}`, sub: formatMonthKey(getMonthKey(getTodayKey())), dark: false },
@@ -435,7 +492,22 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
               ))}
             </div>
 
-            <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700 }}>আজকের এন্ট্রি ({formatDate(getTodayKey())})</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 28 }}>
+              {[
+                { label: "আজকের খরচ", value: `৳${bn(todayExpTotal)}`, sub: `${bn(todayExpTxs.length)} টি এন্ট্রি`, color: "#e74c3c" },
+                { label: "এই মাসের খরচ", value: `৳${bn(monthExpTotal)}`, sub: formatMonthKey(getMonthKey(getTodayKey())), color: "#e74c3c" },
+                { label: "এই বছরের খরচ", value: `৳${bn(yearExpTotal)}`, sub: getYearKey(getTodayKey()) + " সাল", color: "#e74c3c" },
+                { label: "আজকের নিট লাভ", value: `৳${bn(todayTotal - todayExpTotal)}`, sub: "আয় − খরচ", color: "#16a34a" },
+              ].map((s, i) => (
+                <div key={i} style={{ background: "#fff", border: `2px solid ${s.color}`, borderRadius: 14, padding: "18px 20px", boxShadow: `4px 4px 0 ${s.color}` }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 12, color: "#888" }}>{s.label}</p>
+                  <p style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: "#bbb" }}>{s.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700 }}>আজকের আয়ের এন্ট্রি ({formatDate(getTodayKey())})</h3>
             {todayTxs.length === 0
               ? <div style={{ background: "#fff", border: "2px dashed #ddd", borderRadius: 12, padding: "36px", textAlign: "center", color: "#aaa" }}>আজ কোনো সেবা যোগ করা হয়নি</div>
               : <div style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, overflow: "hidden" }}>
@@ -454,8 +526,32 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
                 </div>
             }
             {todayTxs.length > 0 && (
-              <button onClick={() => printReport(todayTxs, "দৈনিক ইনভয়েস", formatDate(getTodayKey()))} style={{ ...S.btn(true), marginTop: 14 }}>
+              <button onClick={() => printReport(todayTxs, "দৈনিক ইনভয়েস", formatDate(getTodayKey()), "serviceName", "আয়")} style={{ ...S.btn(true), marginTop: 14, marginBottom: 28 }}>
                 🖨️ আজকের ইনভয়েস প্রিন্ট করুন
+              </button>
+            )}
+
+            <h3 style={{ margin: "28px 0 12px", fontSize: 15, fontWeight: 700 }}>আজকের খরচের এন্ট্রি ({formatDate(getTodayKey())})</h3>
+            {todayExpTxs.length === 0
+              ? <div style={{ background: "#fff", border: "2px dashed #ddd", borderRadius: 12, padding: "36px", textAlign: "center", color: "#aaa" }}>আজ কোনো খরচ যোগ করা হয়নি</div>
+              : <div style={{ background: "#fff", border: "2px solid #e74c3c", borderRadius: 12, overflow: "hidden" }}>
+                  <table style={S.table}>
+                    <thead><tr>{["সময়","খরচের খাত","সংখ্যা","মূল্য","মোট"].map(h => <th key={h} style={{ ...S.th, background: "#e74c3c" }}>{h}</th>)}</tr></thead>
+                    <tbody>{todayExpTxs.map((tx, i) => (
+                      <tr key={tx.id}>
+                        <td style={S.td(i)}>{new Date(tx.id).toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit" })}</td>
+                        <td style={S.td(i)}>{tx.name}</td>
+                        <td style={S.td(i)}>{bn(tx.qty)}</td>
+                        <td style={S.td(i)}>৳{bn(tx.price)}</td>
+                        <td style={{ ...S.td(i), fontWeight: 600 }}>৳{bn(tx.total)}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+            }
+            {todayExpTxs.length > 0 && (
+              <button onClick={() => printReport(todayExpTxs, "দৈনিক খরচের রিপোর্ট", formatDate(getTodayKey()), "name", "খরচ")} style={{ ...S.btn(true, "#e74c3c"), marginTop: 14 }}>
+                🖨️ আজকের খরচের রিপোর্ট প্রিন্ট করুন
               </button>
             )}
           </div>
@@ -464,14 +560,31 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         {/* ===== SERVICES ===== */}
         {tab === "services" && (
           <div>
-            <h2 style={{ ...S.sectionTitle }}>➕ সেবা যোগ করুন</h2>
+            <h2 style={{ ...S.sectionTitle }}>➕ সেবা যোগ করুন (আয়)</h2>
             <p style={{ color: "#888", fontSize: 13, margin: "0 0 20px" }}>যেকোনো সেবার বাটনে ক্লিক করুন, দাম/পরিমাণ ঠিক করে যোগ করুন।</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 12 }}>
               {services.map(svc => (
-                <button key={svc.id} className="svc-btn" onClick={() => addService(svc)}
+                <button key={svc.id} className="svc-btn" onClick={() => addService(svc, "income")}
                   style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, padding: "16px 14px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "all .2s", boxShadow: "3px 3px 0 #1a1a1a" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, lineHeight: 1.4 }}>{svc.name}</div>
                   <div style={{ fontSize: 20, fontWeight: 700 }}>৳{bn(svc.price)}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== EXPENSES ===== */}
+        {tab === "expenses" && (
+          <div>
+            <h2 style={{ ...S.sectionTitle }}>➖ খরচ যোগ করুন</h2>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 20px" }}>যেকোনো খরচের খাতে ক্লিক করুন, পরিমাণ লিখে যোগ করুন।</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 12 }}>
+              {expenseCats.map(cat => (
+                <button key={cat.id} className="svc-btn" onClick={() => addService(cat, "expense")}
+                  style={{ background: "#fff", border: "2px solid #e74c3c", borderRadius: 12, padding: "16px 14px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "all .2s", boxShadow: "3px 3px 0 #e74c3c" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, lineHeight: 1.4 }}>{cat.name}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#e74c3c" }}>৳{bn(cat.price || 0)}</div>
                 </button>
               ))}
             </div>
@@ -482,6 +595,11 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         {tab === "report" && (
           <div>
             <h2 style={S.sectionTitle}>📋 রিপোর্ট ও হিসাব</h2>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              {[["income","💰 আয়ের রিপোর্ট"],["expense","💸 খরচের রিপোর্ট"]].map(([k,l]) => (
+                <button key={k} onClick={() => setReportType(k)} style={{ ...S.btn(reportType === k, k === "expense" ? "#e74c3c" : "#1a1a1a"), borderRadius: 20, padding: "8px 18px" }}>{l}</button>
+              ))}
+            </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
               {[["day","দৈনিক"],["week","সাপ্তাহিক"],["month","মাসিক"],["year","বার্ষিক"]].map(([k,l]) => (
                 <button key={k} onClick={() => setReportPeriod(k)} style={{ ...S.btn(reportPeriod === k), borderRadius: 20, padding: "7px 16px" }}>{l}</button>
@@ -493,7 +611,7 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
             </div>
 
             {/* Period label */}
-            <div style={{ background: "#1a1a1a", color: "#f5f0e8", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 14, fontWeight: 600 }}>
+            <div style={{ background: reportType === "expense" ? "#e74c3c" : "#1a1a1a", color: "#f5f0e8", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 14, fontWeight: 600 }}>
               {reportPeriod === "day" && `📅 ${formatDate(reportKey)}`}
               {reportPeriod === "week" && `📅 সপ্তাহ: ${formatWeekRange(reportKey)}`}
               {reportPeriod === "month" && `📅 ${formatMonthKey(reportKey)}`}
@@ -506,7 +624,7 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
               : <>
                   <div style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
                     <table style={S.table}>
-                      <thead><tr>{["ক্রমিক","সেবার নাম","বিক্রির সংখ্যা","একক মূল্য","মোট আয়"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
+                      <thead><tr>{["ক্রমিক", reportType === "expense" ? "খরচের খাত" : "সেবার নাম", reportType === "expense" ? "কতবার" : "বিক্রির সংখ্যা", "একক মূল্য", reportType === "expense" ? "মোট খরচ" : "মোট আয়"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
                       <tbody>
                         {reportGrouped.map((r, i) => (
                           <tr key={i}>
@@ -518,15 +636,15 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
                           </tr>
                         ))}
                         <tr style={{ borderTop: "2px solid #1a1a1a" }}>
-                          <td colSpan={4} style={{ padding: "12px 14px", fontWeight: 700, fontSize: 14, background: "#f5f0e8" }}>মোট আয়</td>
+                          <td colSpan={4} style={{ padding: "12px 14px", fontWeight: 700, fontSize: 14, background: "#f5f0e8" }}>মোট {reportType === "expense" ? "খরচ" : "আয়"}</td>
                           <td style={{ padding: "12px 14px", fontWeight: 700, fontSize: 16, background: "#f5f0e8" }}>৳{bn(reportTotal)}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-                  <button onClick={() => printReport(reportTxs, `${reportPeriod === "day" ? "দৈনিক" : reportPeriod === "week" ? "সাপ্তাহিক" : reportPeriod === "month" ? "মাসিক" : "বার্ষিক"} ইনভয়েস`, reportPeriod === "day" ? formatDate(reportKey) : reportPeriod === "week" ? formatWeekRange(reportKey) : reportPeriod === "month" ? formatMonthKey(reportKey) : reportKey + " সাল")}
-                    style={S.btn(true)}>
-                    🖨️ ইনভয়েস প্রিন্ট / PDF করুন
+                  <button onClick={() => printReport(reportTxs, `${reportPeriod === "day" ? "দৈনিক" : reportPeriod === "week" ? "সাপ্তাহিক" : reportPeriod === "month" ? "মাসিক" : "বার্ষিক"} ${reportType === "expense" ? "খরচের রিপোর্ট" : "ইনভয়েস"}`, reportPeriod === "day" ? formatDate(reportKey) : reportPeriod === "week" ? formatWeekRange(reportKey) : reportPeriod === "month" ? formatMonthKey(reportKey) : reportKey + " সাল", reportField, reportType === "expense" ? "খরচ" : "আয়")}
+                    style={S.btn(true, reportType === "expense" ? "#e74c3c" : "#1a1a1a")}>
+                    🖨️ {reportType === "expense" ? "খরচের রিপোর্ট" : "ইনভয়েস"} প্রিন্ট / PDF করুন
                   </button>
                 </>
             }
@@ -534,34 +652,48 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         )}
 
         {/* ===== HISTORY (FULL DRILL-DOWN) ===== */}
-        {tab === "history" && (
+        {tab === "history" && (() => {
+          const histList = historyType === "income" ? transactions : expenses;
+          const histField = historyType === "income" ? "serviceName" : "name";
+          const histLabel = historyType === "income" ? "আয়" : "খরচ";
+          const histColor = historyType === "income" ? "#1a1a1a" : "#e74c3c";
+          const hYears = uniqYears(histList);
+          const switchType = (k) => { setHistoryType(k); setHistoryView("years"); setHistoryYear(null); setHistoryMonth(null); setHistoryWeek(null); };
+          return (
           <div>
             <h2 style={S.sectionTitle}>📅 সম্পূর্ণ ইতিহাস</h2>
+
+            {/* Type toggle */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {[["income","💰 আয়ের ইতিহাস"],["expense","💸 খরচের ইতিহাস"]].map(([k,l]) => (
+                <button key={k} onClick={() => switchType(k)} style={{ ...S.btn(historyType === k, k === "expense" ? "#e74c3c" : "#1a1a1a"), borderRadius: 20, padding: "8px 18px" }}>{l}</button>
+              ))}
+            </div>
 
             {/* Breadcrumb */}
             <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
               <button onClick={() => { setHistoryView("years"); setHistoryYear(null); setHistoryMonth(null); setHistoryWeek(null); }}
-                style={{ ...S.btn(historyView === "years"), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
+                style={{ ...S.btn(historyView === "years", histColor), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
                 সব বছর
               </button>
               {historyYear && <>
                 <span style={{ color: "#aaa" }}>›</span>
                 <button onClick={() => { setHistoryView("months"); setHistoryMonth(null); setHistoryWeek(null); }}
-                  style={{ ...S.btn(historyView === "months"), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
+                  style={{ ...S.btn(historyView === "months", histColor), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
                   {historyYear} সাল
                 </button>
               </>}
               {historyMonth && <>
                 <span style={{ color: "#aaa" }}>›</span>
                 <button onClick={() => { setHistoryView("weeks"); setHistoryWeek(null); }}
-                  style={{ ...S.btn(historyView === "weeks"), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
+                  style={{ ...S.btn(historyView === "weeks", histColor), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
                   {formatMonthKey(historyMonth)}
                 </button>
               </>}
               {historyWeek && <>
                 <span style={{ color: "#aaa" }}>›</span>
                 <button onClick={() => setHistoryView("days")}
-                  style={{ ...S.btn(historyView === "days"), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
+                  style={{ ...S.btn(historyView === "days", histColor), padding: "6px 14px", borderRadius: 20, fontSize: 13 }}>
                   সপ্তাহ
                 </button>
               </>}
@@ -569,22 +701,22 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
 
             {/* YEARS VIEW */}
             {historyView === "years" && (
-              allYears.length === 0
+              hYears.length === 0
                 ? <div style={{ background: "#fff", border: "2px dashed #ddd", borderRadius: 12, padding: "40px", textAlign: "center", color: "#aaa" }}>কোনো ডেটা নেই</div>
                 : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {allYears.map(year => {
-                      const yTxs = getFiltered("year", year);
+                    {hYears.map(year => {
+                      const yTxs = getFiltered(histList, "year", year);
                       const yTotal = sumTotal(yTxs);
                       return (
                         <div key={year} className="hist-row" onClick={() => { setHistoryYear(year); setHistoryView("months"); }}
-                          style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "3px 3px 0 #1a1a1a", transition: "all .15s" }}>
+                          style={{ background: "#fff", border: `2px solid ${histColor}`, borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `3px 3px 0 ${histColor}`, transition: "all .15s" }}>
                           <div>
                             <div style={{ fontSize: 18, fontWeight: 700 }}>📅 {year} সাল</div>
-                            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{bn(yTxs.length)} টি এন্ট্রি • {allMonths(year).length} মাসের ডেটা</div>
+                            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{bn(yTxs.length)} টি এন্ট্রি • {uniqMonths(histList, year).length} মাসের ডেটা</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>৳{bn(yTotal)}</div>
-                            <div style={{ fontSize: 12, color: "#aaa" }}>মোট আয় →</div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: histColor }}>৳{bn(yTotal)}</div>
+                            <div style={{ fontSize: 12, color: "#aaa" }}>মোট {histLabel} →</div>
                           </div>
                         </div>
                       );
@@ -595,19 +727,19 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
             {/* MONTHS VIEW */}
             {historyView === "months" && historyYear && (
               <div>
-                <div style={{ background: "#f5f0e8", border: "2px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontWeight: 700, fontSize: 15 }}>
-                  📅 {historyYear} সালের মাসভিত্তিক ইনকাম
-                  <span style={{ float: "right", color: "#555", fontSize: 13, fontWeight: 600 }}>মোট: ৳{bn(sumTotal(getFiltered("year", historyYear)))}</span>
+                <div style={{ background: "#f5f0e8", border: `2px solid ${histColor}`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontWeight: 700, fontSize: 15 }}>
+                  📅 {historyYear} সালের মাসভিত্তিক {histLabel}
+                  <span style={{ float: "right", color: "#555", fontSize: 13, fontWeight: 600 }}>মোট: ৳{bn(sumTotal(getFiltered(histList, "year", historyYear)))}</span>
                 </div>
-                {allMonths(historyYear).length === 0
+                {uniqMonths(histList, historyYear).length === 0
                   ? <p style={{ color: "#aaa" }}>কোনো ডেটা নেই</p>
                   : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {allMonths(historyYear).map(mk => {
-                        const mTxs = getFiltered("month", mk);
+                      {uniqMonths(histList, historyYear).map(mk => {
+                        const mTxs = getFiltered(histList, "month", mk);
                         const mTotal = sumTotal(mTxs);
                         return (
                           <div key={mk} className="hist-row" onClick={() => { setHistoryMonth(mk); setHistoryView("weeks"); }}
-                            style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "3px 3px 0 #1a1a1a", transition: "all .15s" }}>
+                            style={{ background: "#fff", border: `2px solid ${histColor}`, borderRadius: 12, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `3px 3px 0 ${histColor}`, transition: "all .15s" }}>
                             <div>
                               <div style={{ fontSize: 16, fontWeight: 700 }}>🗓️ {formatMonthKey(mk)}</div>
                               <div style={{ fontSize: 12, color: "#888", marginTop: 3 }}>{bn(mTxs.length)} টি এন্ট্রি</div>
@@ -627,17 +759,17 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
             {/* WEEKS VIEW */}
             {historyView === "weeks" && historyMonth && (
               <div>
-                <div style={{ background: "#f5f0e8", border: "2px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontWeight: 700, fontSize: 15 }}>
-                  🗓️ {formatMonthKey(historyMonth)} — সাপ্তাহিক ইনকাম
-                  <span style={{ float: "right", color: "#555", fontSize: 13, fontWeight: 600 }}>মোট: ৳{bn(sumTotal(getFiltered("month", historyMonth)))}</span>
+                <div style={{ background: "#f5f0e8", border: `2px solid ${histColor}`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontWeight: 700, fontSize: 15 }}>
+                  🗓️ {formatMonthKey(historyMonth)} — সাপ্তাহিক {histLabel}
+                  <span style={{ float: "right", color: "#555", fontSize: 13, fontWeight: 600 }}>মোট: ৳{bn(sumTotal(getFiltered(histList, "month", historyMonth)))}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {allWeeks(historyMonth).map(wk => {
-                    const wTxs = getFiltered("week", wk);
+                  {uniqWeeks(histList, historyMonth).map(wk => {
+                    const wTxs = getFiltered(histList, "week", wk);
                     const wTotal = sumTotal(wTxs);
                     return (
                       <div key={wk} className="hist-row" onClick={() => { setHistoryWeek(wk); setHistoryView("days"); }}
-                        style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "3px 3px 0 #1a1a1a", transition: "all .15s" }}>
+                        style={{ background: "#fff", border: `2px solid ${histColor}`, borderRadius: 12, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `3px 3px 0 ${histColor}`, transition: "all .15s" }}>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 700 }}>📆 {formatWeekRange(wk)}</div>
                           <div style={{ fontSize: 12, color: "#888", marginTop: 3 }}>{bn(wTxs.length)} টি এন্ট্রি</div>
@@ -656,24 +788,24 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
             {/* DAYS VIEW */}
             {historyView === "days" && historyWeek && (
               <div>
-                <div style={{ background: "#f5f0e8", border: "2px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontWeight: 700, fontSize: 15 }}>
-                  📆 সপ্তাহ: {formatWeekRange(historyWeek)} — দৈনিক ইনকাম
-                  <span style={{ float: "right", color: "#555", fontSize: 13, fontWeight: 600 }}>মোট: ৳{bn(sumTotal(getFiltered("week", historyWeek)))}</span>
+                <div style={{ background: "#f5f0e8", border: `2px solid ${histColor}`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontWeight: 700, fontSize: 15 }}>
+                  📆 সপ্তাহ: {formatWeekRange(historyWeek)} — দৈনিক {histLabel}
+                  <span style={{ float: "right", color: "#555", fontSize: 13, fontWeight: 600 }}>মোট: ৳{bn(sumTotal(getFiltered(histList, "week", historyWeek)))}</span>
                 </div>
-                {allDays(historyWeek).map(day => {
-                  const dTxs = getFiltered("day", day);
-                  const dGrouped = groupByService(dTxs);
+                {uniqDays(histList, historyWeek).map(day => {
+                  const dTxs = getFiltered(histList, "day", day);
+                  const dGrouped = groupByItem(dTxs, histField);
                   const dTotal = sumTotal(dTxs);
                   return (
-                    <div key={day} style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, marginBottom: 14, overflow: "hidden", boxShadow: "3px 3px 0 #1a1a1a" }}>
-                      <div style={{ background: "#1a1a1a", color: "#f5f0e8", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={day} style={{ background: "#fff", border: `2px solid ${histColor}`, borderRadius: 12, marginBottom: 14, overflow: "hidden", boxShadow: `3px 3px 0 ${histColor}` }}>
+                      <div style={{ background: histColor, color: "#f5f0e8", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontWeight: 700 }}>📅 {formatDate(day)}</span>
                         <span style={{ color: "#f5a623", fontWeight: 700 }}>৳{bn(dTotal)}</span>
                       </div>
                       {dGrouped.length > 0 && (
                         <>
                           <table style={S.table}>
-                            <thead><tr>{["সেবার নাম","বিক্রি","মোট"].map(h => <th key={h} style={{ ...S.th, background: "#333", fontSize: 12 }}>{h}</th>)}</tr></thead>
+                            <thead><tr>{[histField === "name" ? "খরচের খাত" : "সেবার নাম","বার","মোট"].map(h => <th key={h} style={{ ...S.th, background: "#333", fontSize: 12 }}>{h}</th>)}</tr></thead>
                             <tbody>
                               {dGrouped.map((r, i) => (
                                 <tr key={i}>
@@ -685,8 +817,8 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
                             </tbody>
                           </table>
                           <div style={{ padding: "8px 14px", textAlign: "right" }}>
-                            <button onClick={() => printReport(dTxs, "দৈনিক ইনভয়েস", formatDate(day))}
-                              style={{ ...S.btn(false), fontSize: 12, padding: "6px 14px" }}>🖨️ প্রিন্ট</button>
+                            <button onClick={() => printReport(dTxs, histField === "name" ? "দৈনিক খরচের রিপোর্ট" : "দৈনিক ইনভয়েস", formatDate(day), histField, histLabel)}
+                              style={{ ...S.btn(false, histColor), fontSize: 12, padding: "6px 14px" }}>🖨️ প্রিন্ট</button>
                           </div>
                         </>
                       )}
@@ -696,38 +828,48 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ===== ANALYTICS ===== */}
         {tab === "analytics" && (() => {
+          const aList = analyticsType === "income" ? transactions : expenses;
+          const aField = analyticsType === "income" ? "serviceName" : "name";
+          const aColor = analyticsType === "income" ? "#1a1a1a" : "#e74c3c";
           const periods = [
-            { key: "day", label: "আজ", txs: getFiltered("day", getTodayKey()) },
-            { key: "week", label: "এই সপ্তাহ", txs: getFiltered("week", getWeekKey(getTodayKey())) },
-            { key: "month", label: "এই মাস", txs: getFiltered("month", getMonthKey(getTodayKey())) },
-            { key: "year", label: "এই বছর", txs: getFiltered("year", getYearKey(getTodayKey())) },
+            { key: "day", label: "আজ", txs: getFiltered(aList, "day", getTodayKey()) },
+            { key: "week", label: "এই সপ্তাহ", txs: getFiltered(aList, "week", getWeekKey(getTodayKey())) },
+            { key: "month", label: "এই মাস", txs: getFiltered(aList, "month", getMonthKey(getTodayKey())) },
+            { key: "year", label: "এই বছর", txs: getFiltered(aList, "year", getYearKey(getTodayKey())) },
           ];
 
           return (
             <div>
-              <h2 style={S.sectionTitle}>📈 সেবা বিশ্লেষণ</h2>
-              <p style={{ color: "#888", fontSize: 13, margin: "0 0 24px" }}>কোন সেবা কতবার বিক্রি হয়েছে এবং কত আয় হয়েছে — দিন, সপ্তাহ, মাস ও বছরভিত্তিক।</p>
+              <h2 style={S.sectionTitle}>📈 বিশ্লেষণ</h2>
+              <p style={{ color: "#888", fontSize: 13, margin: "0 0 16px" }}>কোন সেবা/খাত কতবার ব্যবহৃত হয়েছে এবং কত টাকা — দিন, সপ্তাহ, মাস ও বছরভিত্তিক।</p>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+                {[["income","💰 আয় বিশ্লেষণ"],["expense","💸 খরচ বিশ্লেষণ"]].map(([k,l]) => (
+                  <button key={k} onClick={() => setAnalyticsType(k)} style={{ ...S.btn(analyticsType === k, k === "expense" ? "#e74c3c" : "#1a1a1a"), borderRadius: 20, padding: "8px 18px" }}>{l}</button>
+                ))}
+              </div>
 
               {periods.map(period => {
-                const grouped = groupByService(period.txs);
+                const grouped = groupByItem(period.txs, aField);
                 const total = sumTotal(period.txs);
                 if (grouped.length === 0) return null;
                 return (
                   <div key={period.key} style={{ marginBottom: 28 }}>
-                    <div style={{ background: "#1a1a1a", color: "#f5f0e8", borderRadius: "12px 12px 0 0", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: 15 }}>{period.label} — সেবাভিত্তিক আয়</span>
+                    <div style={{ background: aColor, color: "#f5f0e8", borderRadius: "12px 12px 0 0", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>{period.label} — {analyticsType === "income" ? "সেবাভিত্তিক আয়" : "খাতভিত্তিক খরচ"}</span>
                       <span style={{ color: "#f5a623", fontWeight: 700, fontSize: 16 }}>৳{bn(total)}</span>
                     </div>
-                    <div style={{ background: "#fff", border: "2px solid #1a1a1a", borderTop: "none", borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
+                    <div style={{ background: "#fff", border: `2px solid ${aColor}`, borderTop: "none", borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
                       <table style={S.table}>
                         <thead><tr>
-                          <th style={{ ...S.th, background: "#333" }}>সেবার নাম</th>
-                          <th style={{ ...S.th, background: "#333" }}>বিক্রির সংখ্যা</th>
-                          <th style={{ ...S.th, background: "#333" }}>মোট আয়</th>
+                          <th style={{ ...S.th, background: "#333" }}>{analyticsType === "income" ? "সেবার নাম" : "খরচের খাত"}</th>
+                          <th style={{ ...S.th, background: "#333" }}>কতবার</th>
+                          <th style={{ ...S.th, background: "#333" }}>মোট</th>
                           <th style={{ ...S.th, background: "#333" }}>অবদান</th>
                         </tr></thead>
                         <tbody>
@@ -739,7 +881,7 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
                               <td style={S.td(i)}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                   <div style={{ flex: 1, height: 8, background: "#eee", borderRadius: 4, overflow: "hidden" }}>
-                                    <div style={{ width: `${total > 0 ? (r.total / total * 100) : 0}%`, height: "100%", background: "#1a1a1a", borderRadius: 4 }} />
+                                    <div style={{ width: `${total > 0 ? (r.total / total * 100) : 0}%`, height: "100%", background: aColor, borderRadius: 4 }} />
                                   </div>
                                   <span style={{ fontSize: 12, color: "#555", minWidth: 38 }}>
                                     {total > 0 ? Math.round(r.total / total * 100) : 0}%
@@ -755,8 +897,8 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
                 );
               })}
 
-              {transactions.length === 0 && (
-                <div style={{ background: "#fff", border: "2px dashed #ddd", borderRadius: 12, padding: "40px", textAlign: "center", color: "#aaa" }}>এখনো কোনো ডেটা নেই। সেবা যোগ করলে এখানে বিশ্লেষণ দেখাবে।</div>
+              {aList.length === 0 && (
+                <div style={{ background: "#fff", border: "2px dashed #ddd", borderRadius: 12, padding: "40px", textAlign: "center", color: "#aaa" }}>এখনো কোনো ডেটা নেই। {analyticsType === "income" ? "সেবা" : "খরচ"} যোগ করলে এখানে বিশ্লেষণ দেখাবে।</div>
               )}
             </div>
           );
@@ -811,9 +953,59 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
               ))}
             </div>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 36 }}>
               <button onClick={() => { if(window.confirm("সব সেবা ডিফল্টে ফিরিয়ে আনবেন?")) { setServices(DEFAULT_SERVICES); showToast("ডিফল্টে ফিরিয়ে আনা হয়েছে"); }}} style={S.btn(false)}>🔄 ডিফল্টে ফিরুন</button>
               <button onClick={() => showToast("পরিবর্তন সংরক্ষিত হয়েছে ✅")} style={S.btn(true)}>💾 সংরক্ষণ নিশ্চিত করুন</button>
+            </div>
+
+            {/* ===== EXPENSE CATEGORY MANAGEMENT ===== */}
+            <h2 style={{ ...S.sectionTitle, color: "#e74c3c" }}>⚙️ খরচের খাত সম্পাদনা করুন</h2>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 16px" }}>খরচের খাতের নাম পরিবর্তন করুন, নতুন খাত যোগ করুন বা মুছুন।</p>
+
+            <div style={{ background: "#fff", border: "2px dashed #e74c3c", borderRadius: 12, padding: "16px", marginBottom: 20 }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700 }}>➕ নতুন খরচের খাত তৈরি করুন</h3>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <input type="text" placeholder="খাতের নাম লিখুন..." value={newExpName}
+                  onChange={e => setNewExpName(e.target.value)}
+                  style={{ flex: 2, minWidth: 180, padding: "9px 12px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>৳</span>
+                  <input type="number" placeholder="ডিফল্ট মূল্য (ঐচ্ছিক)" value={newExpPrice} onChange={e => setNewExpPrice(e.target.value)}
+                    style={{ width: 150, padding: "9px 10px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                </div>
+                <button onClick={() => {
+                  if (!newExpName.trim()) { showToast("❌ খাতের নাম লিখুন"); return; }
+                  const price = parseFloat(newExpPrice) || 0;
+                  const newCat = { id: Date.now(), name: newExpName.trim(), price };
+                  setExpenseCats(prev => [...prev, newCat]);
+                  setNewExpName(""); setNewExpPrice("");
+                  showToast(`✅ "${newCat.name}" খাত যোগ হয়েছে`);
+                }} style={{ ...S.btn(true, "#e74c3c"), whiteSpace: "nowrap" }}>✅ যোগ করুন</button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              {expenseCats.map((cat, i) => (
+                <div key={cat.id} style={{ background: "#fff", border: "2px solid #e74c3c", borderRadius: 12, padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, color: "#888", minWidth: 24 }}>{i+1}.</span>
+                  <input value={cat.name} onChange={e => setExpenseCats(s => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                    style={{ flex: 2, minWidth: 160, padding: "8px 10px", border: "1.5px solid #ddd", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>৳</span>
+                    <input type="number" value={cat.price} onChange={e => setExpenseCats(s => s.map((x, j) => j === i ? { ...x, price: parseFloat(e.target.value)||0 } : x))}
+                      style={{ width: 85, padding: "8px 10px", border: "1.5px solid #ddd", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                  </div>
+                  <button onClick={() => { if (window.confirm(`"${cat.name}" মুছে ফেলবেন?`)) { setExpenseCats(s => s.filter((_, j) => j !== i)); showToast(`🗑️ মুছে ফেলা হয়েছে`); } }}
+                    style={{ background: "#fff0f0", border: "1.5px solid #e74c3c", color: "#e74c3c", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "inherit" }}>
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={() => { if(window.confirm("সব খাত ডিফল্টে ফিরিয়ে আনবেন?")) { setExpenseCats(DEFAULT_EXPENSE_CATS); showToast("ডিফল্টে ফিরিয়ে আনা হয়েছে"); }}} style={S.btn(false, "#e74c3c")}>🔄 ডিফল্টে ফিরুন</button>
+              <button onClick={() => showToast("পরিবর্তন সংরক্ষিত হয়েছে ✅")} style={S.btn(true, "#e74c3c")}>💾 সংরক্ষণ নিশ্চিত করুন</button>
             </div>
           </div>
         )}
@@ -822,19 +1014,39 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
         {tab === "admin" && isAdmin(user) && (() => {
           const allUsers = getUsers();
           const admins = getAdmins();
+          const seenCount = getSeenUserCount();
+          const newUsers = allUsers.slice(seenCount);
 
           return (
             <div>
               <h2 style={S.sectionTitle}>🛡️ অ্যাডমিন প্যানেল</h2>
               <p style={{ color: "#888", fontSize: 13, margin: "0 0 20px" }}>শুধুমাত্র অ্যাডমিনরা এই পেজ দেখতে পাবেন।</p>
 
+              {/* New user notification */}
+              {newUsers.length > 0 && (
+                <div style={{ background: "#fff7e6", border: "2px solid #f5a623", borderRadius: 12, padding: "16px 18px", marginBottom: 20 }}>
+                  <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 15 }}>🔔 {bn(newUsers.length)} জন নতুন ইউজার নিবন্ধন করেছেন</p>
+                  <ul style={{ margin: "0 0 12px", paddingLeft: 20, fontSize: 13, color: "#555" }}>
+                    {newUsers.map((u, i) => <li key={i}>{u.contact} — {u.joinedAt ? formatDate(u.joinedAt.split("T")[0]) : "—"}</li>)}
+                  </ul>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <a href={`https://wa.me/880${ADMIN_CONTACT}?text=${encodeURIComponent("নতুন ইউজার তালিকা:\n" + newUsers.map(u => "• " + u.contact).join("\n"))}`}
+                      target="_blank" rel="noreferrer"
+                      style={{ ...S.btn(true, "#16a34a"), textDecoration: "none", display: "inline-block" }}>📱 WhatsApp এ পাঠান</a>
+                    <button onClick={() => markUsersSeen(allUsers.length)} style={S.btn(false)}>✅ দেখা হয়েছে চিহ্নিত করুন</button>
+                  </div>
+                  <p style={{ margin: "10px 0 0", fontSize: 11, color: "#aaa" }}>স্বয়ংক্রিয়ভাবে ইমেইল/হোয়াটসঅ্যাপ মেসেজ পাঠাতে একটি ব্যাকএন্ড সার্ভার (যেমন Firebase Functions বা EmailJS) প্রয়োজন। এই বাটনে ক্লিক করলে আপনার WhatsApp এ প্রি-লেখা মেসেজ খুলে যাবে, শুধু পাঠাতে হবে।</p>
+                </div>
+              )}
+
               {/* Stats */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 28 }}>
                 {[
                   { label: "মোট ইউজার", value: bn(allUsers.length), icon: "👥" },
                   { label: "মোট অ্যাডমিন", value: bn(admins.length), icon: "🛡️" },
-                  { label: "মোট ট্রানজেকশন", value: bn(transactions.length), icon: "💳" },
                   { label: "সর্বমোট আয়", value: `৳${bn(sumTotal(transactions))}`, icon: "💰" },
+                  { label: "সর্বমোট খরচ", value: `৳${bn(sumTotal(expenses))}`, icon: "💸" },
+                  { label: "সর্বমোট নিট লাভ", value: `৳${bn(sumTotal(transactions) - sumTotal(expenses))}`, icon: "📈" },
                 ].map((s, i) => (
                   <div key={i} style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: 12, padding: "16px 18px", boxShadow: "3px 3px 0 #1a1a1a" }}>
                     <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
@@ -937,13 +1149,13 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
 
       </div>
 
-      {/* ===== ADD SERVICE MODAL ===== */}
+      {/* ===== ADD SERVICE / EXPENSE MODAL ===== */}
       {editService && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 380, border: "2px solid #1a1a1a", boxShadow: "6px 6px 0 #1a1a1a" }}>
-            <h3 style={{ margin: "0 0 20px", fontSize: 17, fontWeight: 700 }}>সেবা যোগ করুন</h3>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 380, border: `2px solid ${editService.kind === "expense" ? "#e74c3c" : "#1a1a1a"}`, boxShadow: `6px 6px 0 ${editService.kind === "expense" ? "#e74c3c" : "#1a1a1a"}` }}>
+            <h3 style={{ margin: "0 0 20px", fontSize: 17, fontWeight: 700 }}>{editService.kind === "expense" ? "খরচ যোগ করুন" : "সেবা যোগ করুন"}</h3>
             {[
-              { label: "সেবার নাম", type: "text", val: editName, set: setEditName },
+              { label: editService.kind === "expense" ? "খাতের নাম" : "সেবার নাম", type: "text", val: editName, set: setEditName },
               { label: "মূল্য (৳)", type: "number", val: editPrice, set: setEditPrice },
               { label: "সংখ্যা", type: "number", val: editQty, set: setEditQty, min: 1 },
             ].map(f => (
@@ -958,7 +1170,7 @@ ${grouped.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.qty}</td
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setEditService(null)} style={{ ...S.btn(false), flex: 1 }}>বাতিল</button>
-              <button onClick={confirmAdd} style={{ ...S.btn(true), flex: 1 }}>✅ যোগ করুন</button>
+              <button onClick={confirmAdd} style={{ ...S.btn(true, editService.kind === "expense" ? "#e74c3c" : "#1a1a1a"), flex: 1 }}>✅ যোগ করুন</button>
             </div>
           </div>
         </div>
