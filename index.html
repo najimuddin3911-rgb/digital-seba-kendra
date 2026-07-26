@@ -339,6 +339,17 @@ function App(){
   const [expDate,setExpDate]=useState(getTodayKey());
   const [dataLoaded,setDataLoaded]=useState(false);
 
+  // ===== ব্যক্তিগত হিসাব (ব্যবসার হিসাব থেকে সম্পূর্ণ আলাদা) =====
+  const [personalCash,setPersonalCash]=useState([]); // {id,date,type:'in'|'out',amount,note,fbKey}
+  const [personalExpenses,setPersonalExpenses]=useState([]); // {id,date,amount,desc,category,fbKey}
+  const [loans,setLoans]=useState([]); // {id,date,party,type:'receivable'|'payable',amount,note,paid,fbKey}
+  const [pCashForm,setPCashForm]=useState({amount:"",note:"",date:getTodayKey(),type:"in"});
+  const [pExpForm,setPExpForm]=useState({amount:"",desc:"",category:"",date:getTodayKey()});
+  const [loanForm,setLoanForm]=useState({party:"",amount:"",note:"",date:getTodayKey(),type:"receivable"});
+  const [loanTab,setLoanTab]=useState("receivable"); // receivable(আমি পাব) | payable(আমাকে দিতে হবে)
+  const [settleInputs,setSettleInputs]=useState({});
+  const [pSubTab,setPSubTab]=useState("cash"); // cash | loans | expenses
+
   // ইতিহাস (drill-down) স্টেট
   const [historyType,setHistoryType]=useState("income"); // income | expense
   const [historyView,setHistoryView]=useState("years"); // years|months|weeks|days
@@ -358,13 +369,22 @@ function App(){
     if(!user)return;
     setDataLoaded(false);
     const uid=safeKey(user.contact);setLoading(true);
-    Promise.all([fbGet(`users/${uid}/services`),fbGet(`users/${uid}/transactions`),fbGet(`users/${uid}/expenses`)]).then(([svcs,txs,exs])=>{
+    Promise.all([
+      fbGet(`users/${uid}/services`),fbGet(`users/${uid}/transactions`),fbGet(`users/${uid}/expenses`),
+      fbGet(`users/${uid}/personal/cashLog`),fbGet(`users/${uid}/personal/expenses`),fbGet(`users/${uid}/personal/loans`)
+    ]).then(([svcs,txs,exs,pCash,pExs,lns])=>{
       if(svcs&&Array.isArray(svcs))setServices(svcs);
       else if(svcs&&typeof svcs==='object'&&!Array.isArray(svcs))setServices(Object.values(svcs));
       if(txs&&typeof txs==='object'){const arr=Object.entries(txs).map(([k,v])=>({...v,fbKey:k}));setTransactions(arr.sort((a,b)=>a.id-b.id));}
       else setTransactions([]);
       if(exs&&typeof exs==='object'){const arr=Object.entries(exs).map(([k,v])=>({...v,fbKey:k}));setExpenses(arr.sort((a,b)=>a.id-b.id));}
       else setExpenses([]);
+      if(pCash&&typeof pCash==='object'){const arr=Object.entries(pCash).map(([k,v])=>({...v,fbKey:k}));setPersonalCash(arr.sort((a,b)=>a.id-b.id));}
+      else setPersonalCash([]);
+      if(pExs&&typeof pExs==='object'){const arr=Object.entries(pExs).map(([k,v])=>({...v,fbKey:k}));setPersonalExpenses(arr.sort((a,b)=>a.id-b.id));}
+      else setPersonalExpenses([]);
+      if(lns&&typeof lns==='object'){const arr=Object.entries(lns).map(([k,v])=>({...v,fbKey:k}));setLoans(arr.sort((a,b)=>a.id-b.id));}
+      else setLoans([]);
       setLoading(false);
       setDataLoaded(true);
     }).catch(()=>{setLoading(false);setDataLoaded(true);});
@@ -395,6 +415,71 @@ function App(){
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(""),2600);}
 
+  // ===== ব্যক্তিগত হিসাব — ফাংশনসমূহ (ব্যবসার হিসাব থেকে সম্পূর্ণ আলাদা Firebase পাথে সংরক্ষিত) =====
+  async function addCashEntry(){
+    if(!pCashForm.amount||parseFloat(pCashForm.amount)<=0){showToast("❌ সঠিক পরিমাণ লিখুন");return;}
+    const en={id:Date.now(),date:pCashForm.date||getTodayKey(),type:pCashForm.type,amount:parseFloat(pCashForm.amount)||0,note:pCashForm.note||(pCashForm.type==="in"?"জমা":"উত্তোলন")};
+    const res=await fbPush(`users/${safeKey(user.contact)}/personal/cashLog`,en);
+    setPersonalCash(p=>[...p,{...en,fbKey:res.name}]);
+    setPCashForm({amount:"",note:"",date:getTodayKey(),type:pCashForm.type});
+    showToast(`✅ ${en.type==="in"?"জমা":"উত্তোলন"} হয়েছে: ৳${bn(en.amount)}`);
+  }
+  async function deleteCashEntry(id){
+    if(!window.confirm("এই এন্ট্রিটি মুছে ফেলতে চান?"))return;
+    const en=personalCash.find(e=>e.id===id);
+    if(en&&en.fbKey) await fetch(`${FIREBASE_URL}/users/${safeKey(user.contact)}/personal/cashLog/${en.fbKey}.json`,{method:"DELETE"});
+    setPersonalCash(p=>p.filter(e=>e.id!==id));
+  }
+  async function addLoan(){
+    if(!loanForm.party||!loanForm.amount||parseFloat(loanForm.amount)<=0){showToast("❌ নাম ও সঠিক পরিমাণ লিখুন");return;}
+    const ln={id:Date.now(),date:loanForm.date||getTodayKey(),party:loanForm.party,type:loanForm.type,amount:parseFloat(loanForm.amount)||0,note:loanForm.note||"",paid:0};
+    const res=await fbPush(`users/${safeKey(user.contact)}/personal/loans`,ln);
+    setLoans(p=>[...p,{...ln,fbKey:res.name}]);
+    setLoanForm({party:"",amount:"",note:"",date:getTodayKey(),type:loanForm.type});
+    showToast(`✅ যোগ হয়েছে: ${ln.party} — ৳${bn(ln.amount)}`);
+  }
+  async function settleLoan(id){
+    const ln=loans.find(l=>l.id===id); if(!ln)return;
+    const add=parseFloat(settleInputs[id])||0;
+    if(add<=0){showToast("❌ সঠিক পরিমাণ লিখুন");return;}
+    const due=ln.amount-(ln.paid||0);
+    const newPaid=Math.min(ln.amount,(ln.paid||0)+add);
+    if(add>due+0.001){showToast("❌ বকেয়ার চেয়ে বেশি পরিমাণ দেওয়া যাবে না");return;}
+    if(ln.fbKey) await fetch(`${FIREBASE_URL}/users/${safeKey(user.contact)}/personal/loans/${ln.fbKey}.json`,{method:"PATCH",body:JSON.stringify({paid:newPaid})});
+    setLoans(p=>p.map(l=>l.id===id?{...l,paid:newPaid}:l));
+    setSettleInputs(s=>({...s,[id]:""}));
+    showToast("✅ পরিশোধের হিসাব আপডেট হয়েছে");
+  }
+  async function deleteLoan(id){
+    if(!window.confirm("এই হিসাবটি মুছে ফেলতে চান?"))return;
+    const ln=loans.find(l=>l.id===id);
+    if(ln&&ln.fbKey) await fetch(`${FIREBASE_URL}/users/${safeKey(user.contact)}/personal/loans/${ln.fbKey}.json`,{method:"DELETE"});
+    setLoans(p=>p.filter(l=>l.id!==id));
+  }
+  async function addPersonalExpense(){
+    if(!pExpForm.amount||!pExpForm.desc){showToast("❌ পরিমাণ ও বিবরণ লিখুন");return;}
+    const ex={id:Date.now(),date:pExpForm.date||getTodayKey(),amount:parseFloat(pExpForm.amount)||0,desc:pExpForm.desc,category:pExpForm.category||"ব্যক্তিগত"};
+    const res=await fbPush(`users/${safeKey(user.contact)}/personal/expenses`,ex);
+    setPersonalExpenses(p=>[...p,{...ex,fbKey:res.name}]);
+    setPExpForm({amount:"",desc:"",category:"",date:getTodayKey()});
+    showToast(`✅ ব্যক্তিগত খরচ যোগ হয়েছে: ৳${bn(ex.amount)}`);
+  }
+  async function deletePersonalExpense(id){
+    if(!window.confirm("এই খরচ মুছে ফেলতে চান?"))return;
+    const ex=personalExpenses.find(e=>e.id===id);
+    if(ex&&ex.fbKey) await fetch(`${FIREBASE_URL}/users/${safeKey(user.contact)}/personal/expenses/${ex.fbKey}.json`,{method:"DELETE"});
+    setPersonalExpenses(p=>p.filter(e=>e.id!==id));
+  }
+  // ব্যক্তিগত ব্যালেন্স হিসাব — শুধুই personal নোড থেকে, ব্যবসার আয়/ব্যয়ের সাথে কোনো সম্পর্ক নেই
+  const pCashIn=personalCash.filter(e=>e.type==="in").reduce((s,e)=>s+e.amount,0);
+  const pCashOut=personalCash.filter(e=>e.type==="out").reduce((s,e)=>s+e.amount,0);
+  const pExpenseTotal=personalExpenses.reduce((s,e)=>s+e.amount,0);
+  const personalBalance=pCashIn-pCashOut-pExpenseTotal;
+  const receivableLoans=loans.filter(l=>l.type==="receivable");
+  const payableLoans=loans.filter(l=>l.type==="payable");
+  const totalReceivable=receivableLoans.reduce((s,l)=>s+(l.amount-(l.paid||0)),0);
+  const totalPayable=payableLoans.reduce((s,l)=>s+(l.amount-(l.paid||0)),0);
+
   function openAuth(mode){setAuthInitMode(mode);setLmode(mode);setLerr("");setShowAuthModal(true);}
 
   async function handleAuth(e){
@@ -418,7 +503,7 @@ function App(){
     }catch{setLerr("সংযোগ সমস্যা। আবার চেষ্টা করুন।");setLoading(false);}
   }
 
-  function handleLogout(){localStorage.removeItem("dsUser");setUser(null);setTransactions([]);setServices(DEFAULT_SERVICES);setExpenses([]);setTab("dashboard");}
+  function handleLogout(){localStorage.removeItem("dsUser");setUser(null);setTransactions([]);setServices(DEFAULT_SERVICES);setExpenses([]);setPersonalCash([]);setPersonalExpenses([]);setLoans([]);setTab("dashboard");}
 
   function isAdmin(u){if(!u)return false;if(u.contact===ADMIN_CONTACT||u.contact===ADMIN_EMAIL)return true;return admins.includes(u.contact);}
 
@@ -556,11 +641,13 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
     w.document.close();
   }
 
-  const rKey=rPeriod==="day"?rDate:rPeriod==="week"?getWeekKey(rDate):rPeriod==="month"?getMonthKey(rDate):getYearKey(rDate);  const rTxs=getFiltered(rPeriod,rKey),rGr=groupTx(rTxs),rTotal=rGr.reduce((s,r)=>s+r.total,0);
+  const rKey=rPeriod==="day"?rDate:rPeriod==="week"?getWeekKey(rDate):rPeriod==="month"?getMonthKey(rDate):getYearKey(rDate);  const rTxs=getFiltered(rPeriod,rKey),rGr=groupTx(rTxs).sort((a,b)=>b.total-a.total),rTotal=rGr.reduce((s,r)=>s+r.total,0);
+  // সর্বমোট (সর্বকালের) সেবাভিত্তিক বিক্রয় সারাংশ — কোন সেবা কতবার সেল হয়েছে ও মোট কত আয় হয়েছে
+  const allTimeServiceSummary=groupTx(transactions).sort((a,b)=>b.total-a.total);
   const todayTxs=getFiltered("day",getTodayKey()),todayTotal=todayTxs.reduce((s,t)=>s+t.total,0);
   const monthTotal=getFiltered("month",getMonthKey(getTodayKey())).reduce((s,t)=>s+t.total,0);
   const yearTotal=getFiltered("year",getYearKey(getTodayKey())).reduce((s,t)=>s+t.total,0);
-  const navItems=[{key:"dashboard",label:"ড্যাশবোর্ড",icon:"📊"},{key:"services",label:"সেবা যোগ",icon:"➕"},{key:"report",label:"হিসাব ও রিপোর্ট",icon:"📋"},{key:"history",label:"সম্পূর্ণ ইতিহাস",icon:"📅"},{key:"manage",label:"সেবা সম্পাদনা",icon:"⚙️"},...(isAdmin(user)?[{key:"admin",label:"অ্যাডমিন",icon:"🛡️"}]:[])];
+  const navItems=[{key:"dashboard",label:"ড্যাশবোর্ড",icon:"📊"},{key:"services",label:"সেবা যোগ",icon:"➕"},{key:"report",label:"হিসাব ও রিপোর্ট",icon:"📋"},{key:"history",label:"সম্পূর্ণ ইতিহাস",icon:"📅"},{key:"personal",label:"ব্যক্তিগত হিসাব",icon:"👛"},{key:"manage",label:"সেবা সম্পাদনা",icon:"⚙️"},...(isAdmin(user)?[{key:"admin",label:"অ্যাডমিন",icon:"🛡️"}]:[])];
 
   // ===== ইতিহাস (drill-down) হেল্পার =====
   const histDataset=historyType==="income"?transactions:expenses;
@@ -988,6 +1075,25 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
               {rGr.length===0
                 ?<div style={{background:C.gbg,border:`2px dashed ${C.b}`,borderRadius:10,padding:"28px",textAlign:"center",color:C.m,fontSize:13}}>এই সময়ের জন্য কোনো আয় নেই</div>
                 :<>
+                  {/* সেবাভিত্তিক সারাংশ — কোন সেবা কতবার সেল হয়েছে ও কত আয় হয়েছে (নির্বাচিত সময়ের জন্য) */}
+                  <p style={{margin:"0 0 8px",fontSize:13,fontWeight:700,color:C.g}}>📦 সেবাভিত্তিক সারাংশ ({["দৈনিক","সাপ্তাহিক","মাসিক","বার্ষিক"][["day","week","month","year"].indexOf(rPeriod)]})</p>
+                  <div style={{border:`1.5px solid ${C.b}`,borderRadius:10,overflow:"hidden",marginBottom:16}}>
+                    <table style={{width:"100%",borderCollapse:"collapse"}}>
+                      <thead><tr>{["সেবার নাম","কতবার সেল হয়েছে","একক মূল্য","মোট আয়"].map(h=><TH key={h} c={h}/>)}</tr></thead>
+                      <tbody>
+                        {rGr.map((r,i)=>(
+                          <tr key={r.name}>
+                            <TD c={r.name} i={i}/>
+                            <TD c={`${bn(r.qty)} বার`} i={i}/>
+                            <TD c={`৳${bn(r.price)}`} i={i}/>
+                            <TD c={`৳${bn(r.total)}`} i={i} bold/>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p style={{margin:"0 0 8px",fontSize:13,fontWeight:700,color:C.g}}>🧾 বিস্তারিত এন্ট্রি</p>
                   <div style={{border:`1.5px solid ${C.b}`,borderRadius:10,overflow:"hidden",marginBottom:12}}>
                     <table style={{width:"100%",borderCollapse:"collapse"}}>
                       <thead><tr>{["ক্রমিক","তারিখ","সেবার নাম","সংখ্যা","একক মূল্য","মোট"].map(h=><TH key={h} c={h}/>)}</tr></thead>
@@ -1011,6 +1117,27 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
                   </div>
                   <button onClick={()=>printInvoice(rPeriod,rKey)} style={{...bs(true),fontSize:13,padding:"9px 18px"}}>🖨️ আয়ের ইনভয়েস প্রিন্ট / PDF করুন</button>
                 </>
+              }
+
+              {/* সর্বমোট (সর্বকালের) সেবাভিত্তিক বিক্রয় সারাংশ */}
+              {allTimeServiceSummary.length>0&&
+                <div style={{marginTop:20,paddingTop:16,borderTop:`1.5px dashed ${C.b}`}}>
+                  <p style={{margin:"0 0 8px",fontSize:13,fontWeight:700,color:C.g}}>🏆 সর্বমোট (সর্বকালের) সেবাভিত্তিক বিক্রয়</p>
+                  <div style={{border:`1.5px solid ${C.b}`,borderRadius:10,overflow:"hidden"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse"}}>
+                      <thead><tr>{["সেবার নাম","সর্বমোট কতবার সেল হয়েছে","মোট আয়"].map(h=><TH key={h} c={h}/>)}</tr></thead>
+                      <tbody>
+                        {allTimeServiceSummary.map((r,i)=>(
+                          <tr key={r.name}>
+                            <TD c={r.name} i={i}/>
+                            <TD c={`${bn(r.qty)} বার`} i={i}/>
+                            <TD c={`৳${bn(r.total)}`} i={i} bold/>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               }
             </div>
 
@@ -1319,6 +1446,175 @@ td{padding:9px 12px;border-bottom:1px solid #f0d0d0;font-size:13px}tr:nth-child(
                 <p style={{margin:"2px 0",fontSize:13}}>✉️ Email: <a href={`mailto:${ADMIN_EMAIL}`} style={{color:"#2563eb",fontWeight:700}}>{ADMIN_EMAIL}</a></p>
               </div>
             </>}
+          </div>
+        )}
+
+        {/* ===== ব্যক্তিগত হিসাব — ব্যবসার আয়-ব্যয়ের সাথে সম্পূর্ণ আলাদা ===== */}
+        {tab==="personal"&&(
+          <div className="fade-in">
+            <h2 style={{margin:"0 0 4px",fontSize:20,fontWeight:700,color:C.g}}>👛 ব্যক্তিগত হিসাব</h2>
+            <p style={{color:C.m,fontSize:13,margin:"0 0 20px"}}>এটি আপনার ব্যক্তিগত টাকার হিসাব — ব্যবসার আয়/ব্যয়ের হিসাবের সাথে এর কোনো সম্পর্ক নেই, সম্পূর্ণ আলাদাভাবে সংরক্ষিত হয়।</p>
+
+            {/* ব্যালেন্স সারাংশ */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:22}}>
+              {[
+                {label:"বর্তমান হাতে টাকা",value:`৳${bn(personalBalance<0?0:personalBalance)}`,color:C.g,bg:C.gbg,border:C.b},
+                {label:"আমি পাব (পাওনা)",value:`৳${bn(totalReceivable)}`,color:C.gold,bg:"#fdf8f0",border:"#e8d5a0"},
+                {label:"আমাকে দিতে হবে (দেনা)",value:`৳${bn(totalPayable)}`,color:"#c0392b",bg:"#fff5f5",border:"#fcc"},
+                {label:"মোট ব্যক্তিগত খরচ",value:`৳${bn(pExpenseTotal)}`,color:"#8a5a00",bg:"#fff9ec",border:"#f0dca0"},
+              ].map((s,i)=>(
+                <div key={i} style={{background:s.bg,border:`1.5px solid ${s.border}`,borderRadius:12,padding:"14px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <p style={{margin:"0 0 4px",fontSize:11,color:"#888",fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>{s.label}</p>
+                  <p style={{margin:0,fontSize:19,fontWeight:700,color:s.color}}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* সাব-ট্যাব */}
+            <div style={{display:"flex",gap:0,marginBottom:18,background:"#f0f0f0",padding:4,borderRadius:10,maxWidth:480}}>
+              {[["cash","💰 নগদ হিসাব"],["loans","🤝 ধার-দেনা"],["expenses","💸 ব্যক্তিগত খরচ"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setPSubTab(k)}
+                  style={{flex:1,padding:"9px 4px",borderRadius:8,border:"none",background:pSubTab===k?C.g:"transparent",color:pSubTab===k?"#fff":"#666",fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:"inherit",transition:"all .2s"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {/* ===== নগদ হিসাব ===== */}
+            {pSubTab==="cash"&&(
+              <div className="fade-in">
+                <div style={{background:C.w,border:`2px solid ${C.b}`,borderRadius:16,padding:18,marginBottom:18,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <h3 style={{margin:"0 0 14px",fontSize:15,fontWeight:700,color:C.g}}>➕ নতুন এমাউন্ট যোগ / উত্তোলন করুন</h3>
+                  <div style={{display:"flex",gap:8,marginBottom:12}}>
+                    {[["in","জমা (যোগ)"],["out","উত্তোলন (খরচ/বের করা)"]].map(([k,l])=>(
+                      <button key={k} onClick={()=>setPCashForm(f=>({...f,type:k}))} style={{...bs(pCashForm.type===k),borderRadius:20,padding:"7px 16px",fontSize:13}}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:12}}>
+                    <input type="number" placeholder="পরিমাণ (৳)" value={pCashForm.amount} onChange={e=>setPCashForm(f=>({...f,amount:e.target.value}))} style={inp}/>
+                    <input type="text" placeholder="নোট (যেমন: ব্যবসার লাভ থেকে)" value={pCashForm.note} onChange={e=>setPCashForm(f=>({...f,note:e.target.value}))} style={inp}/>
+                    <input type="date" value={pCashForm.date} onChange={e=>setPCashForm(f=>({...f,date:e.target.value}))} style={inp}/>
+                  </div>
+                  <button onClick={addCashEntry} style={{...bs(true),fontSize:13,padding:"9px 18px"}}>✅ সংরক্ষণ করুন</button>
+                </div>
+
+                <div style={{background:C.w,border:`2px solid ${C.b}`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <div style={{background:C.g,color:"#fff",padding:"12px 18px",fontWeight:700,fontSize:15}}>📜 নগদ লেনদেনের তালিকা</div>
+                  {personalCash.length===0?<p style={{padding:20,color:C.m,fontSize:13}}>এখনো কোনো এন্ট্রি নেই</p>:
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr>{["তারিখ","ধরন","নোট","পরিমাণ",""].map(h=><TH key={h} c={h}/>)}</tr></thead>
+                    <tbody>{[...personalCash].reverse().map((e,i)=>(
+                      <tr key={e.id}>
+                        <TD c={formatDate(e.date)} i={i}/>
+                        <TD c={e.type==="in"?"জমা":"উত্তোলন"} i={i}/>
+                        <TD c={e.note||"—"} i={i}/>
+                        <td style={{padding:"8px 10px",background:i%2===0?C.w:"#f5fbf7",fontWeight:700,color:e.type==="in"?C.g:"#c0392b",fontSize:13}}>{e.type==="in"?"+":"-"}৳{bn(e.amount)}</td>
+                        <td style={{padding:"8px 10px",background:i%2===0?C.w:"#f5fbf7"}}>
+                          <button onClick={()=>deleteCashEntry(e.id)} style={{background:"#fff5f5",border:"1px solid #e74c3c",color:"#e74c3c",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>🗑️</button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>}
+                </div>
+              </div>
+            )}
+
+            {/* ===== ধার-দেনা ===== */}
+            {pSubTab==="loans"&&(
+              <div className="fade-in">
+                <div style={{background:C.w,border:`2px solid ${C.b}`,borderRadius:16,padding:18,marginBottom:18,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <h3 style={{margin:"0 0 14px",fontSize:15,fontWeight:700,color:C.g}}>➕ নতুন ধার-দেনার হিসাব যোগ করুন</h3>
+                  <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                    {[["receivable","আমি পাব (অন্যকে দিয়েছি)"],["payable","আমাকে দিতে হবে (অন্যের থেকে নিয়েছি)"]].map(([k,l])=>(
+                      <button key={k} onClick={()=>setLoanForm(f=>({...f,type:k}))} style={{...bs(loanForm.type===k),borderRadius:20,padding:"7px 16px",fontSize:13}}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:12}}>
+                    <input type="text" placeholder="নাম (কার সাথে হিসাব)" value={loanForm.party} onChange={e=>setLoanForm(f=>({...f,party:e.target.value}))} style={inp}/>
+                    <input type="number" placeholder="পরিমাণ (৳)" value={loanForm.amount} onChange={e=>setLoanForm(f=>({...f,amount:e.target.value}))} style={inp}/>
+                    <input type="date" value={loanForm.date} onChange={e=>setLoanForm(f=>({...f,date:e.target.value}))} style={inp}/>
+                    <input type="text" placeholder="নোট (ঐচ্ছিক)" value={loanForm.note} onChange={e=>setLoanForm(f=>({...f,note:e.target.value}))} style={inp}/>
+                  </div>
+                  <button onClick={addLoan} style={{...bs(true),fontSize:13,padding:"9px 18px"}}>✅ সংরক্ষণ করুন</button>
+                </div>
+
+                {/* ফিল্টার ট্যাব */}
+                <div style={{display:"flex",gap:8,marginBottom:14}}>
+                  <button onClick={()=>setLoanTab("receivable")} style={{...bs(loanTab==="receivable"),borderRadius:20,padding:"7px 16px",fontSize:13}}>আমি পাব ({bn(receivableLoans.length)})</button>
+                  <button onClick={()=>setLoanTab("payable")} style={{...bs(loanTab==="payable"),borderRadius:20,padding:"7px 16px",fontSize:13}}>আমাকে দিতে হবে ({bn(payableLoans.length)})</button>
+                </div>
+
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {(loanTab==="receivable"?receivableLoans:payableLoans).length===0
+                    ?<div style={{background:C.gbg,border:`2px dashed ${C.b}`,borderRadius:10,padding:"28px",textAlign:"center",color:C.m,fontSize:13}}>কোনো হিসাব নেই</div>
+                    :(loanTab==="receivable"?receivableLoans:payableLoans).map(l=>{
+                      const due=l.amount-(l.paid||0);
+                      const settled=due<=0.001;
+                      return(
+                        <div key={l.id} style={{background:C.w,border:`2px solid ${settled?"#b7e0c0":C.b}`,borderRadius:12,padding:"14px 18px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+                            <div>
+                              <div style={{fontSize:15,fontWeight:700,color:C.t}}>{l.party}</div>
+                              <div style={{fontSize:12,color:C.m,marginTop:2}}>{formatDate(l.date)}{l.note?` • ${l.note}`:""}</div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                              <div style={{fontSize:12,color:C.m}}>মোট: ৳{bn(l.amount)} • পরিশোধ: ৳{bn(l.paid||0)}</div>
+                              <div style={{fontSize:17,fontWeight:700,color:settled?C.g:(loanTab==="receivable"?C.gold:"#c0392b")}}>{settled?"✅ সম্পূর্ণ পরিশোধিত":`বাকি: ৳${bn(due)}`}</div>
+                            </div>
+                          </div>
+                          {!settled&&
+                            <div style={{display:"flex",gap:8,marginTop:10}}>
+                              <input type="number" placeholder="পরিশোধের পরিমাণ" value={settleInputs[l.id]||""} onChange={e=>setSettleInputs(s=>({...s,[l.id]:e.target.value}))} style={{...inp,padding:"7px 10px",fontSize:12}}/>
+                              <button onClick={()=>settleLoan(l.id)} style={{...bs(true),fontSize:12,padding:"7px 14px",whiteSpace:"nowrap"}}>জমা করুন</button>
+                            </div>
+                          }
+                          <button onClick={()=>deleteLoan(l.id)} style={{marginTop:10,background:"#fff5f5",border:"1px solid #e74c3c",color:"#e74c3c",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:11}}>🗑️ মুছুন</button>
+                        </div>
+                      );
+                    })
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* ===== ব্যক্তিগত খরচ ===== */}
+            {pSubTab==="expenses"&&(
+              <div className="fade-in">
+                <div style={{background:C.w,border:`2px solid ${C.b}`,borderRadius:16,padding:18,marginBottom:18,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <h3 style={{margin:"0 0 14px",fontSize:15,fontWeight:700,color:C.g}}>➕ নতুন ব্যক্তিগত খরচ যোগ করুন</h3>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:12}}>
+                    <input type="number" placeholder="পরিমাণ (৳)" value={pExpForm.amount} onChange={e=>setPExpForm(f=>({...f,amount:e.target.value}))} style={inp}/>
+                    <input type="text" placeholder="কী খরচ হয়েছে" value={pExpForm.desc} onChange={e=>setPExpForm(f=>({...f,desc:e.target.value}))} style={inp}/>
+                    <input type="text" placeholder="ক্যাটাগরি (ঐচ্ছিক)" value={pExpForm.category} onChange={e=>setPExpForm(f=>({...f,category:e.target.value}))} style={inp}/>
+                    <input type="date" value={pExpForm.date} onChange={e=>setPExpForm(f=>({...f,date:e.target.value}))} style={inp}/>
+                  </div>
+                  <button onClick={addPersonalExpense} style={{...bs(true),fontSize:13,padding:"9px 18px"}}>✅ সংরক্ষণ করুন</button>
+                </div>
+
+                <div style={{background:"#c0392b",borderRadius:11,padding:"14px 18px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{color:"rgba(255,255,255,0.8)",fontSize:13,fontWeight:600}}>মোট ব্যক্তিগত খরচ (সর্বমোট)</span>
+                  <span style={{color:"#fff",fontSize:22,fontWeight:700}}>৳{bn(pExpenseTotal)}</span>
+                </div>
+
+                <div style={{background:C.w,border:`2px solid ${C.b}`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  {personalExpenses.length===0?<p style={{padding:20,color:C.m,fontSize:13}}>এখনো কোনো খরচ নেই</p>:
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr>{["তারিখ","কী খরচ হয়েছে","ক্যাটাগরি","পরিমাণ",""].map(h=><TH key={h} c={h}/>)}</tr></thead>
+                    <tbody>{[...personalExpenses].reverse().map((ex,i)=>(
+                      <tr key={ex.id}>
+                        <TD c={formatDate(ex.date)} i={i}/>
+                        <TD c={ex.desc} i={i}/>
+                        <TD c={ex.category||"ব্যক্তিগত"} i={i}/>
+                        <TD c={`৳${bn(ex.amount)}`} i={i} bold/>
+                        <td style={{padding:"8px 10px",background:i%2===0?C.w:"#f5fbf7"}}>
+                          <button onClick={()=>deletePersonalExpense(ex.id)} style={{background:"#fff5f5",border:"1px solid #e74c3c",color:"#e74c3c",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>🗑️</button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
